@@ -1,3 +1,15 @@
+---
+title: kvstoremon
+description: Lightweight, cross-platform encrypted key-value store for local-first secret and configuration management.
+version: 0.1.0
+lang: go
+go: "1.26"
+license: MIT
+platforms: [linux, darwin, windows]
+architectures: [amd64, arm64]
+tags: [kv-store, encryption, secrets, config-management, tpm, cli, rest-api]
+---
+
 # kvstoremon
 
 A lightweight, cross-platform encrypted key-value store. Local-first secret and configuration management with a single binary.

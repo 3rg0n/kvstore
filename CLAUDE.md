@@ -1,3 +1,22 @@
+---
+title: CLAUDE.md
+description: Development guidance for Claude Code (claude.ai/code) operating in this repository.
+project: kvstoremon
+lang: go
+go: "1.26"
+module: github.com/ecopelan/kvstoremon
+entry: cmd/kvstoremon/main.go
+store: bbolt
+encryption: AES-256-GCM
+kdf: Argon2id
+dependencies:
+  - github.com/spf13/cobra
+  - go.etcd.io/bbolt
+  - github.com/kardianos/service
+  - golang.org/x/crypto
+  - golang.org/x/term
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
