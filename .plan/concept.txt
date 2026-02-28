@@ -1,0 +1,137 @@
+Build a light KV store that with windows, Linux and mac and tpm. go service, cross platform, built using sqlite3 + encryption and uses tpm to unseal store. apps can call the kv store as a variable. I think that is the right way. How would we build a modern light kv store that requires tpm for mac, Linux and windows. Does this solve local dev problem or is windows/mac considered secure or is the problem if you download malware they will have access to it.
+
+Some ideas on tools: 
+
+https://github.com/google/go-tpm-tools
+
+And medium blog:
+
+Storing secrets in the cloud is hard. The dilemma of the first secret is a problem which is often overlooked.
+If we store our secrets encrypted then where does the first password come from?
+
+We should treat cloud services as insecure by default. Many serverless providers let you enter secrets on their website that is injected into the runtime of our applications, but how do they secure these secrets from attackers ? How can I be sure a malicious employee won’t access my environment variables? It’s a black box really.
+We can use a secret manager, like provided by Google or AWS but still the API keys to access the secret manager must be stored somewhere.
+
+Obviously the choice would be to not use serverless at all and chose different cloud services, like a VPS. Those will let you have a more fine grained control over your secrets and environment variables. You can store them in memory, or in etcd with kubernetes or use docker secrets, but those too can share the first secret problem.
+
+
+Secure Environments in the cloud.
+Everything you copy to your VPS is on the providers hard drive, often without encryption, just waiting for somebody to scoop it up. Really it doesn’t seem too secure if you ask me.
+
+This is where TPM comes in handy.
+
+The Trusted Platform Module is a secure cryptoprocessor, a dedicated hardware available in all modern computers. It might be familiar as this is the feature windows 11 depends on and won’t run without.
+
+But we are dealing with Servers in the cloud here so it’s Linux all the way, sorry BSD folks, I dunno how things are over there.
+Using Linux servers you can access the TPM at /dev/tpm0 and /dev/tpmrm0 . You can go check your server if it supports it now!
+TPM is available on hardware servers as firmware TPM and it is available in the virtualized environment as virtual TPM. Google, AWS and other providers will support this feature. The Xen hypervisor supports virtualized TPMs.
+
+
+Using the TPM is not Rocket Science anymore as I found out from the authors of tpm2-tools youtube presention, however it is still very confusing and can take many steps. I will explain gotpm which is created by google (but not an official product) it provides the necessary abstractions so we don’t have to know about how the TPM actually works, we can just use it with a single CLI command!
+
+TPM provides many cryptography features, what we are looking for is called seal and unseal. A seal operation will encrypt some data with the TPM, that can be only decrypted by the same TPM using unseal.
+
+How does this solve our first secret problem?
+The encryption keys are stored in the hardware device itself, so we don’t have to store encryption keys anywhere.
+No keys in memory or in a volume means less attack surface. We can also make assertions about the state of the system using the PCR registry in the TPM, so we can restrict decryption to specific states of the machine, like when the machine is booting. This is actually how some of the harddrive encryption software stores keys but it’s an advanced topic and outside the scope for now.
+
+I will show you know how to encrypt an environment variable, map the TPM device to a docker container, then some code on how to decrypt the secret in the runtime of the application without the container or the system learning about it.
+
+You need gotpm and build a binary, clone the repository and follow the instructions to build it.
+
+GitHub - google/go-tpm-tools: Go packages built on go-tpm providing a high-level API for using TPMs
+Go packages built on go-tpm providing a high-level API for using TPMs - GitHub - google/go-tpm-tools: Go packages built…
+github.com
+
+You need to install docker and need to know how to use a dockerfile to build a container image. You can also use k8s if you know how.
+
+Get Docker
+Download and install Docker on the platform of your choice, including Mac, Linux, or Windows.
+docs.docker.com
+
+Now when building a docker image, we can simply copy the built binary to the container. I’m making the assumption that we are building and deploying on the same CPU architecture. Mac users might have to adjust their build.
+
+Device setup
+To use TPM encrypted environment variables, your secrets must be encrypted per device. You can do so simply with
+
+gotpm seal <input string>.
+I recommend storing your variables in a json for easy parsing and base64 encode it before sealing it.
+
+Map the TPM device to your docker container:
+
+docker run … - device /dev/tpm0:/dev/tpm0 - device /dev/tpmrm0:/dev/tpmrm0 …
+After you built the image, the — device flag lets you map the TPM devices to the running container, so you can access it! You can do the same for docker compose or kubernetes and mount the device!
+
+The gotpm binary built into the container can be used to decrypt the encrypted environment variables and it only works on the specific device.
+gotpm unseal <input>
+Here is some code using Deno that will take the encrypted environment and inject it into the runtime environment. Treat it as pseudo code and implement your own!
+
+//This code assumes the encrypted environemt was base64 encoded 
+//before encryption and after it too! This simply helps, instead of json, we use base64 encoded string
+import * as base64 from "https://deno.land/std@0.207.0/encoding/base64.ts";
+export async function configureEnv(encryptedEnv: string) {
+// The configureEnv funciton takes the encrypted environment as a base64 encoded string
+  const uintCipherEnv = base64.decodeBase64(encryptedEnv);
+  const textDecoder = new TextDecoder();
+// After decoding we have a json string our unseal command can operate on
+  const plainBase64Env = await runCommand(
+// The gotpm binary must be accessable inside the container and our script will execute it
+    "gotpm",
+    ["unseal"],
+    textDecoder.decode(uintCipherEnv),
+  );
+ // Decode the decrypted string
+  const uintPlainEnv = base64.decodeBase64(plainBase64Env);
+  // Call a function to assign it to your runtime environment
+  assignEnv(textDecoder.decode(uintPlainEnv));
+}
+
+//A generic command runner. This should run gotpm and get the json string output!
+async function runCommand(
+  commandName: string,
+  commandArgs: string[],
+  input: string,
+): Promise<string> {
+  const command = new Deno.Command(commandName, {
+    args: commandArgs,
+    stdin: "piped",
+    stdout: "piped",
+  });
+  const process = command.spawn();
+  const writer = process.stdin.getWriter();
+  writer.write(new TextEncoder().encode(input));
+  writer.releaseLock();
+  await process.stdin.close();
+  const result = await process.output();
+  const textDecoder = new TextDecoder();
+  const out = textDecoder.decode(result.stdout);
+  if (out.endsWith("\n")) {
+    return out.slice(0, out.length - 1);
+  } else {
+    return out;
+  }
+}
+
+//assign the decrypted env to the runtime environment!
+function assignEnv(plaintext: string) {
+  const json = JSON.parse(plaintext);
+  // We use an enum for now to store the fields of the environment
+  const envfields = Object.values(EnvFields);
+  envfields.forEach((envkey) => {
+    setEnv(envkey, json[envkey]);
+  });
+}
+// A deno specific function that sets the env
+function setEnv(key: string, value: string) {
+  Deno.env.set(key, value);
+}
+// Just an example, your Environment fields should match the keys of the JSON
+enum EnvFiels {
+  ENVNAME = "ENVNAME"
+}
+Or something like that. It depends on what language you use. You can deliver encrypted environment many ways. Use docker secrets, store it in a volume or Kubernetes. You can even serve it from a Rest API based on a hardware identifier. It’s up to you. You can set up your devices and then serve a different secret per cluster.
+If your encrypted string leaks, it still requires physical access to your servers to decrypt it.
+
+And that’s it. This was posted to serve as a guide line and general information to steer you on a path, using your own implementation later.
+
+Treat your environment variables right and secure your servers with a TPM. It’s not that hard.

@@ -1,0 +1,27 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - bodyclose
+    - gosec
+
+linters-settings:
+  gosec:
+    excludes:
+      - G104
+      - G115
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  exclude-dirs:
+    - bin
