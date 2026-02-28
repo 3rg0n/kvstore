@@ -1,0 +1,29 @@
+go.mod
+  0924a5adc36051e4 3
+.github/workflows/ci.yml
+  0924a5adc36051e4 1-29
+Makefile
+  0924a5adc36051e4 16
+.github/workflows/release.yml
+  0924a5adc36051e4 1-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "3dc1426f8553b45766731a3e261912af3fb1eb86",
+  "prompts": {
+    "0924a5adc36051e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2df3379e-490c-4961-bddb-06b5022bb0e6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 102,
+      "total_deletions": 2,
+      "accepted_lines": 101,
+      "overriden_lines": 0
+    }
+  }
+}
