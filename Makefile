@@ -13,6 +13,7 @@ build-all:
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY)-darwin-amd64 ./cmd/kvstoremon
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY)-darwin-arm64 ./cmd/kvstoremon
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY)-windows-amd64.exe ./cmd/kvstoremon
+	GOOS=windows GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY)-windows-arm64.exe ./cmd/kvstoremon
 
 test:
 	go test ./... -v -race -count=1
