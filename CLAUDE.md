@@ -15,6 +15,8 @@ dependencies:
   - github.com/kardianos/service
   - golang.org/x/crypto
   - golang.org/x/term
+  - github.com/google/uuid
+  - golang.org/x/sys
 ---
 
 # CLAUDE.md
@@ -40,19 +42,24 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 
 ### Package Layout
 
-- `cmd/kvstoremon/main.go` — CLI entry point. All cobra commands (init, set, get, delete, list, serve, service, version) live here. Uses `kardianos/service` for cross-platform OS service integration.
+- `cmd/kvstoremon/main.go` — CLI entry point. All cobra commands (init, set, get, delete, list, serve, service, version, app) live here. Uses `kardianos/service` for cross-platform OS service integration. Includes `confirmIdentity()` helper (biometric-first, password-fallback).
 - `internal/crypto` — AES-256-GCM encryption with Argon2id key derivation. Stateless functions.
-- `internal/store` — Core KV store backed by bbolt. Handles encryption at the storage layer: values are JSON-marshaled `Entry` structs encrypted before writing. Namespaces map to bbolt buckets. `_meta` bucket stores salt and verification token.
-- `internal/server` — HTTP REST API using Go 1.22+ stdlib routing (`http.ServeMux` with method+path patterns). Binds to localhost only by default.
-- `internal/config` — Platform-specific data directory resolution (XDG on Linux, Library on macOS, APPDATA on Windows).
+- `internal/store` — Core KV store backed by bbolt. Handles encryption at the storage layer: values are JSON-marshaled `Entry` structs encrypted before writing. Namespaces map to bbolt buckets. `_meta` bucket stores salt, verification token, and mode (password/tpm). `_apps` bucket stores encrypted app registration records. Supports both password-derived and TPM-sealed master keys via `KeySealer` interface.
+- `internal/auth` — App registry (`Registry`) and HTTP auth middleware (`Middleware`). Registry manages app records with dual verify modes (SHA-256 hash or code signature). Middleware extracts `Authorization: Bearer <token>`, validates against registry, enforces namespace ACLs, and optionally verifies caller binary via `ProcessVerifier` interface.
+- `internal/platform` — OS abstraction layer with build-tagged implementations for Windows, macOS, and Linux. Provides `Platform` interface with: IPC listeners (named pipes/Unix sockets), process attestation (`PeerPID`, `ProcessPath`), biometric prompts, and TPM seal/unseal. Current implementations use stubs for biometric and TPM (structural, not yet hardware-backed).
+- `internal/server` — HTTP REST API using Go 1.22+ stdlib routing (`http.ServeMux` with method+path patterns). Accepts a `net.Listener` (for platform-specific IPC) and optional `*auth.Middleware`. Health endpoint is always unauthenticated; KV routes are wrapped with auth when middleware is provided.
+- `internal/config` — Platform-specific data directory and socket path resolution (XDG on Linux, Library on macOS, APPDATA on Windows). `SocketPath()` returns the IPC endpoint path.
 - `internal/service` — Thin wrapper around `kardianos/service` for OS service install/uninstall.
 
 ### Data Flow
 
-1. `kvstoremon init` → user provides password → Argon2id derives key from password+random salt → verification token encrypted with key → salt and encrypted token stored in `_meta` bucket
-2. On unlock → salt read from `_meta` → key re-derived → verification token decrypted to confirm correct password
-3. Set/Get → entry JSON marshaled → encrypted with AES-256-GCM (random nonce per write) → stored in namespace bucket
-4. HTTP API delegates directly to store methods — no additional auth layer (localhost-only)
+1. **Password init**: `kvstoremon init` → password → Argon2id derives key from password+salt → verification token encrypted → salt+token stored in `_meta`
+2. **TPM init**: `kvstoremon init --tpm` → random 32-byte key generated → sealed with TPM → sealed blob + encrypted verification token stored in `_meta` (mode=tpm)
+3. **Password unlock**: salt read → key re-derived → verification token decrypted
+4. **TPM unlock**: sealed blob read → TPM unseal → key recovered → verification token decrypted
+5. Set/Get → entry JSON marshaled → encrypted with AES-256-GCM (random nonce per write) → stored in namespace bucket
+6. **App registration**: `kvstoremon app register --binary <path> --namespaces <ns>` → biometric/password confirmation → binary hashed or signature extracted → token generated (kvs_ prefix) → token hash + app record stored in `_apps` bucket
+7. **HTTP auth flow**: request → extract `Bearer <token>` → resolve caller PID via IPC connection → get binary path → `Registry.Verify(token, binaryPath, namespace)` → match token hash → verify binary identity → check namespace ACL → allow or reject (401/403)
 
 ### Key Design Decisions
 
@@ -61,3 +68,28 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 - **Namespace = bbolt bucket**: natural isolation, efficient key enumeration per namespace
 - **Password via env var** (`KVSTOREMON_KEY`): required for service mode, optional interactive prompt for CLI
 - **`kardianos/service`**: unified service management across Windows SCM, systemd, launchd
+- **AppStore interface**: `auth.Registry` depends on a small interface (`PutAppRecord`, `GetAppRecord`, `DeleteAppRecord`, `ListAppRecords`), not the full `*store.Store` — keeps auth decoupled from storage
+- **KeySealer interface**: Store depends on `TPMSeal`/`TPMUnseal` for hardware key binding, not the full Platform
+- **ProcessVerifier interface**: Middleware depends on `PeerPID`/`ProcessPath` for process attestation, not the full Platform
+- **Dual verify modes**: Hash mode (SHA-256 of binary, most secure) vs signature mode (code signing identity, survives updates)
+- **ConnContext pattern**: `http.Server.ConnContext` injects `net.Conn` into request context for PID resolution without modifying handler signatures
+- **`--no-auth` flag**: Backwards-compatible; nil middleware = no auth enforcement (for development/migration)
+- **Biometric-first, password-fallback**: `confirmIdentity()` tries platform biometric, then re-enters master password
+
+### CLI Commands
+
+```
+kvstoremon init [--tpm]                          # Initialize store (password or TPM-sealed)
+kvstoremon set <namespace> <key> <value>         # Set a key-value pair
+kvstoremon get <namespace> <key> [--json]         # Get a value
+kvstoremon delete <namespace> <key>              # Delete a key
+kvstoremon list [namespace]                      # List namespaces or keys
+kvstoremon serve [--addr <addr>] [--no-auth]     # Start HTTP API server
+kvstoremon service install|uninstall|start|stop|status  # OS service management
+kvstoremon app register --binary <path> --namespaces <ns> [--name <n>] [--verify hash|signature|auto]
+kvstoremon app list                              # List registered apps
+kvstoremon app revoke <app-id>                   # Revoke app access
+kvstoremon app rehash <app-id>                   # Re-hash binary after update
+kvstoremon app update-ns <app-id> --namespaces <ns>  # Change namespace ACLs
+kvstoremon version                               # Print version
+```
