@@ -1,0 +1,35 @@
+cmd/kvstoremon/main.go
+  7864934018b48233 45,271,285-295,325,327
+.tasks/step2-auth-middleware.md
+  7864934018b48233 1-22
+internal/server/server.go
+  7864934018b48233 12,47-49,55-62,65-69
+internal/auth/middleware_test.go
+  7864934018b48233 1-222
+internal/auth/registry.go
+  7864934018b48233 199-200,226-227,232-233,240,248-249
+internal/auth/middleware.go
+  7864934018b48233 1-86
+internal/server/server_test.go
+  7864934018b48233 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "10b730edfd456c9d4dc8cfa785591f4fcac549db",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 390,
+      "total_deletions": 33,
+      "accepted_lines": 372,
+      "overriden_lines": 0
+    }
+  }
+}
