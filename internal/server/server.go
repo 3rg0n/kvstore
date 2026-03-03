@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ecopelan/kvstoremon/internal/auth"
 	"github.com/ecopelan/kvstoremon/internal/store"
 )
 
@@ -43,20 +44,29 @@ type setRequest struct {
 	Value string `json:"value"`
 }
 
-// New creates a new HTTP API server.
-func New(s *store.Store, logger *slog.Logger) *Server {
+// New creates a new HTTP API server. If authMw is non-nil, all KV routes
+// require a valid app token. The health endpoint is always unauthenticated.
+func New(s *store.Store, logger *slog.Logger, authMw *auth.Middleware) *Server {
 	srv := &Server{
 		store:  s,
 		logger: logger,
 	}
 
+	// wrap optionally applies auth middleware when configured.
+	wrap := func(h http.HandlerFunc) http.HandlerFunc {
+		if authMw != nil {
+			return authMw.RequireAuth(h)
+		}
+		return h
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", srv.handleHealth)
-	mux.HandleFunc("GET /api/v1/kv", srv.handleListNamespaces)
-	mux.HandleFunc("GET /api/v1/kv/{namespace}", srv.handleList)
-	mux.HandleFunc("GET /api/v1/kv/{namespace}/{key}", srv.handleGet)
-	mux.HandleFunc("PUT /api/v1/kv/{namespace}/{key}", srv.handleSet)
-	mux.HandleFunc("DELETE /api/v1/kv/{namespace}/{key}", srv.handleDelete)
+	mux.HandleFunc("GET /api/v1/kv", wrap(srv.handleListNamespaces))
+	mux.HandleFunc("GET /api/v1/kv/{namespace}", wrap(srv.handleList))
+	mux.HandleFunc("GET /api/v1/kv/{namespace}/{key}", wrap(srv.handleGet))
+	mux.HandleFunc("PUT /api/v1/kv/{namespace}/{key}", wrap(srv.handleSet))
+	mux.HandleFunc("DELETE /api/v1/kv/{namespace}/{key}", wrap(srv.handleDelete))
 
 	srv.http = &http.Server{
 		Handler:      mux,

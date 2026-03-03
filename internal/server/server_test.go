@@ -26,7 +26,7 @@ func testServer(t *testing.T) (*Server, *http.ServeMux) {
 	t.Cleanup(func() { _ = s.Close() })
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	srv := New(s, logger)
+	srv := New(s, logger, nil)
 	return srv, srv.http.Handler.(*http.ServeMux)
 }
 

@@ -42,6 +42,7 @@ func init() {
 
 	getCmd.Flags().Bool("json", false, "output in JSON format")
 	serveCmd.Flags().StringP("addr", "a", config.DefaultAddr, "listen address")
+	serveCmd.Flags().Bool("no-auth", false, "disable app token authentication (development/migration only)")
 
 	appRegisterCmd.Flags().String("binary", "", "path to the application binary (required)")
 	appRegisterCmd.Flags().StringSlice("namespaces", nil, "allowed namespaces (comma-separated, required)")
@@ -267,6 +268,7 @@ var listCmd = &cobra.Command{
 
 type serveProgram struct {
 	addr   string
+	noAuth bool
 	srv    *server.Server
 	store  *store.Store
 	logger *slog.Logger
@@ -280,7 +282,17 @@ func (p *serveProgram) Start(_ service.Service) error {
 	}
 
 	p.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	p.srv = server.New(p.store, p.logger)
+
+	var authMw *auth.Middleware
+	if !p.noAuth {
+		reg := auth.NewRegistry(p.store)
+		authMw = auth.NewMiddleware(reg)
+		p.logger.Info("app token authentication enabled")
+	} else {
+		p.logger.Warn("app token authentication DISABLED (--no-auth)")
+	}
+
+	p.srv = server.New(p.store, p.logger, authMw)
 
 	go func() {
 		if err := p.srv.Start(p.addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -310,8 +322,9 @@ var serveCmd = &cobra.Command{
 	Short: "Start the HTTP API server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		addr, _ := cmd.Flags().GetString("addr")
+		noAuth, _ := cmd.Flags().GetBool("no-auth")
 
-		prg := &serveProgram{addr: addr}
+		prg := &serveProgram{addr: addr, noAuth: noAuth}
 
 		svcCfg := &service.Config{
 			Name: "kvstoremon",

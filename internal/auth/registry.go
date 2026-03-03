@@ -196,6 +196,8 @@ func (r *Registry) List() ([]AppRecord, error) {
 }
 
 // Verify validates a token against a calling binary and namespace.
+// If binaryPath is empty, binary identity verification is skipped (used when
+// process attestation is not yet available, e.g. over TCP before Step 3).
 // Returns the matched AppRecord or an error describing the failure.
 func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, error) {
 	tHash := hashToken(token)
@@ -221,28 +223,30 @@ func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, erro
 		return nil, ErrInvalidToken
 	}
 
-	// Verify binary identity
-	switch matched.VerifyMode {
-	case VerifyHash:
-		hash, err := HashBinary(binaryPath)
-		if err != nil {
-			return nil, fmt.Errorf("hashing caller binary: %w", err)
-		}
-		if hash != matched.BinaryHash {
-			return nil, ErrBinaryMismatch
-		}
-	case VerifySignature:
-		signerID, signed, err := CheckSignature(binaryPath)
-		if err != nil {
-			return nil, fmt.Errorf("checking caller signature: %w", err)
-		}
-		if !signed || signerID != matched.SignerID {
-			return nil, ErrBinaryMismatch
+	// Verify binary identity (skipped when binaryPath is empty)
+	if binaryPath != "" {
+		switch matched.VerifyMode {
+		case VerifyHash:
+			hash, err := HashBinary(binaryPath)
+			if err != nil {
+				return nil, fmt.Errorf("hashing caller binary: %w", err)
+			}
+			if hash != matched.BinaryHash {
+				return nil, ErrBinaryMismatch
+			}
+		case VerifySignature:
+			signerID, signed, err := CheckSignature(binaryPath)
+			if err != nil {
+				return nil, fmt.Errorf("checking caller signature: %w", err)
+			}
+			if !signed || signerID != matched.SignerID {
+				return nil, ErrBinaryMismatch
+			}
 		}
 	}
 
-	// Check namespace ACL
-	if !namespaceAllowed(matched.Namespaces, namespace) {
+	// Check namespace ACL (skipped when namespace is empty, e.g. list-namespaces)
+	if namespace != "" && !namespaceAllowed(matched.Namespaces, namespace) {
 		return nil, ErrNamespaceDenied
 	}
 
