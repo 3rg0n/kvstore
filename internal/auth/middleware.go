@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -11,20 +13,40 @@ type contextKey string
 
 const appRecordCtxKey contextKey = "app_record"
 
+type connCtxKey struct{}
+
+// ProcessVerifier resolves a network connection to a binary path.
+// Implemented by platform.Platform.
+type ProcessVerifier interface {
+	PeerPID(conn net.Conn) (int, error)
+	ProcessPath(pid int) (string, error)
+}
+
 // Middleware validates app tokens and namespace ACLs on HTTP requests.
 type Middleware struct {
 	registry *Registry
+	verifier ProcessVerifier // nil = skip binary verification
+	logger   *slog.Logger
 }
 
 // NewMiddleware creates auth middleware backed by the given registry.
-func NewMiddleware(registry *Registry) *Middleware {
-	return &Middleware{registry: registry}
+// If verifier is non-nil, binary identity is verified via process attestation.
+func NewMiddleware(registry *Registry, verifier ProcessVerifier, logger *slog.Logger) *Middleware {
+	return &Middleware{registry: registry, verifier: verifier, logger: logger}
+}
+
+// ConnContext returns a function suitable for http.Server.ConnContext that
+// injects each connection into the request context. This enables the
+// middleware to retrieve the peer PID for process attestation.
+func ConnContext(ctx context.Context, conn net.Conn) context.Context {
+	return context.WithValue(ctx, connCtxKey{}, conn)
 }
 
 // RequireAuth wraps a handler with token and namespace ACL verification.
 // The namespace is extracted from r.PathValue("namespace"); if empty (e.g.
 // list-namespaces endpoint), only the token is validated.
-// Binary identity verification is deferred to Step 3 (process attestation).
+// When a ProcessVerifier is configured, the caller's binary path is resolved
+// from the connection and verified against the app record.
 func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := extractBearerToken(r)
@@ -35,8 +57,10 @@ func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 		namespace := r.PathValue("namespace")
 
-		// Empty binaryPath: skip binary verification (no process attestation yet)
-		rec, err := m.registry.Verify(token, "", namespace)
+		// Attempt to resolve caller binary path via process attestation
+		binaryPath := m.resolveBinaryPath(r.Context())
+
+		rec, err := m.registry.Verify(token, binaryPath, namespace)
 		if err != nil {
 			switch err {
 			case ErrInvalidToken:
@@ -54,6 +78,33 @@ func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		ctx := context.WithValue(r.Context(), appRecordCtxKey, rec)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// resolveBinaryPath attempts to get the caller's binary path from the
+// connection stored in context. Returns empty string if unavailable.
+func (m *Middleware) resolveBinaryPath(ctx context.Context) string {
+	if m.verifier == nil {
+		return ""
+	}
+
+	conn, ok := ctx.Value(connCtxKey{}).(net.Conn)
+	if !ok || conn == nil {
+		return ""
+	}
+
+	pid, err := m.verifier.PeerPID(conn)
+	if err != nil {
+		m.logger.Debug("PeerPID failed", "err", err)
+		return ""
+	}
+
+	path, err := m.verifier.ProcessPath(pid)
+	if err != nil {
+		m.logger.Debug("ProcessPath failed", "pid", pid, "err", err)
+		return ""
+	}
+
+	return path
 }
 
 // AppFromContext retrieves the verified AppRecord from the request context.

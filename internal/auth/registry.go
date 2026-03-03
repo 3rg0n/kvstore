@@ -275,7 +275,7 @@ func (r *Registry) putRecord(rec *AppRecord) error {
 
 // HashBinary computes the SHA-256 hash of a file at the given path.
 func HashBinary(path string) (string, error) {
-	f, err := os.Open(filepath.Clean(path))
+	f, err := os.Open(filepath.Clean(path)) //nolint:gosec // path is cleaned
 	if err != nil {
 		return "", fmt.Errorf("opening binary: %w", err)
 	}

@@ -68,23 +68,26 @@ func New(s *store.Store, logger *slog.Logger, authMw *auth.Middleware) *Server {
 	mux.HandleFunc("PUT /api/v1/kv/{namespace}/{key}", wrap(srv.handleSet))
 	mux.HandleFunc("DELETE /api/v1/kv/{namespace}/{key}", wrap(srv.handleDelete))
 
-	srv.http = &http.Server{
+	httpSrv := &http.Server{
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// When auth middleware is active, inject connections into request
+	// context so the middleware can resolve caller PID → binary path.
+	if authMw != nil {
+		httpSrv.ConnContext = auth.ConnContext
+	}
+
+	srv.http = httpSrv
 	return srv
 }
 
-// Start starts the HTTP server on the given address.
-func (s *Server) Start(addr string) error {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	s.logger.Info("server started", "addr", addr)
+// Start starts the HTTP server on the given listener.
+func (s *Server) Start(ln net.Listener) error {
+	s.logger.Info("server started", "addr", ln.Addr())
 	return s.http.Serve(ln)
 }
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ecopelan/kvstoremon/internal/auth"
 	"github.com/ecopelan/kvstoremon/internal/config"
+	"github.com/ecopelan/kvstoremon/internal/platform"
 	"github.com/ecopelan/kvstoremon/internal/server"
 	svc "github.com/ecopelan/kvstoremon/internal/service"
 	"github.com/ecopelan/kvstoremon/internal/store"
@@ -284,18 +286,36 @@ func (p *serveProgram) Start(_ service.Service) error {
 	p.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	var authMw *auth.Middleware
+	var ln net.Listener
+	plat := platform.New()
+
 	if !p.noAuth {
 		reg := auth.NewRegistry(p.store)
-		authMw = auth.NewMiddleware(reg)
-		p.logger.Info("app token authentication enabled")
+		authMw = auth.NewMiddleware(reg, plat, p.logger)
+
+		sockPath := config.SocketPath()
+		ln, err = plat.Listener(sockPath)
+		if err != nil {
+			p.logger.Warn("platform listener failed, falling back to TCP",
+				"err", err, "addr", p.addr)
+			ln, err = net.Listen("tcp", p.addr)
+			if err != nil {
+				return fmt.Errorf("listen: %w", err)
+			}
+		}
+		p.logger.Info("app token authentication enabled", "listener", ln.Addr())
 	} else {
 		p.logger.Warn("app token authentication DISABLED (--no-auth)")
+		ln, err = net.Listen("tcp", p.addr)
+		if err != nil {
+			return fmt.Errorf("listen: %w", err)
+		}
 	}
 
 	p.srv = server.New(p.store, p.logger, authMw)
 
 	go func() {
-		if err := p.srv.Start(p.addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := p.srv.Start(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			p.logger.Error("server error", "err", err)
 		}
 	}()

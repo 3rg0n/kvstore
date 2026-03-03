@@ -37,6 +37,21 @@ func StorePath() string {
 	return filepath.Join(DataDir(), "store.db")
 }
 
+// SocketPath returns the platform-specific IPC socket/pipe path.
+func SocketPath() string {
+	switch runtime.GOOS {
+	case "windows":
+		return AppName // becomes \\.\pipe\kvstoremon
+	case "linux":
+		if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
+			return filepath.Join(xdg, AppName+".sock")
+		}
+		return filepath.Join(DataDir(), AppName+".sock")
+	default: // darwin
+		return filepath.Join(DataDir(), AppName+".sock")
+	}
+}
+
 // EnsureDataDir creates the data directory if it doesn't exist.
 func EnsureDataDir() error {
 	return os.MkdirAll(DataDir(), 0700)

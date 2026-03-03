@@ -2,6 +2,8 @@ package auth
 
 import (
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -29,7 +31,7 @@ func setupMiddleware(t *testing.T) (*Middleware, string) {
 		t.Fatalf("register: %v", err)
 	}
 
-	mw := NewMiddleware(reg)
+	mw := NewMiddleware(reg, nil, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 	return mw, token
 }
 
@@ -208,7 +210,7 @@ func TestMiddlewareWildcardNamespace(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	mw := NewMiddleware(reg)
+	mw := NewMiddleware(reg, nil, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 	mux := setupMux(mw)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/kv/any-namespace/key1", nil)
