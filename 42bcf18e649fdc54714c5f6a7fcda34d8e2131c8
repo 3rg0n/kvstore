@@ -1,0 +1,27 @@
+CLAUDE.md
+  7864934018b48233 18-19,45,47-51,56-62,71-95
+.tasks/step6-docs.md
+  7864934018b48233 1-26
+internal/server/server_integration_test.go
+  7864934018b48233 1-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "42bcf18e649fdc54714c5f6a7fcda34d8e2131c8",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 267,
+      "total_deletions": 8,
+      "accepted_lines": 267,
+      "overriden_lines": 0
+    }
+  }
+}
