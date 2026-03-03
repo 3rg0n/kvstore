@@ -1,0 +1,45 @@
+internal/platform/platform_test.go
+  7864934018b48233 1-62
+internal/platform/platform_darwin.go
+  7864934018b48233 1-104
+internal/auth/middleware.go
+  7864934018b48233 6-7,16-24,28-29,33-42,48-49,60-61,63,83-104,106-107
+internal/platform/platform_windows.go
+  7864934018b48233 1-97
+internal/platform/platform_linux.go
+  7864934018b48233 1-74
+internal/auth/registry.go
+  7864934018b48233 278
+cmd/kvstoremon/main.go
+  7864934018b48233 10,18,289-291,294-306,309-312,318
+internal/config/config.go
+  7864934018b48233 40-54
+internal/server/server.go
+  7864934018b48233 71,78-84,88-90
+internal/auth/middleware_test.go
+  7864934018b48233 5-6,34,213
+internal/platform/platform.go
+  7864934018b48233 1-19
+.tasks/step3-platform-listeners.md
+  7864934018b48233 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "16d6816569102a67ad1be68549e35101a6e17a41",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 545,
+      "total_deletions": 65,
+      "accepted_lines": 499,
+      "overriden_lines": 0
+    }
+  }
+}
