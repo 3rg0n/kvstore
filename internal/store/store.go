@@ -17,6 +17,7 @@ var (
 	ErrAlreadyInit    = errors.New("store already initialized")
 
 	metaBucket  = []byte("_meta")
+	appsBucket  = []byte("_apps")
 	saltKey     = []byte("salt")
 	verifyKey   = []byte("verify")
 	verifyToken = []byte("kvstoremon-verification-token")
@@ -244,13 +245,96 @@ func (s *Store) ListNamespaces() ([]string, error) {
 	var namespaces []string
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			if string(name) != string(metaBucket) {
+			if string(name) != string(metaBucket) && string(name) != string(appsBucket) {
 				namespaces = append(namespaces, string(name))
 			}
 			return nil
 		})
 	})
 	return namespaces, err
+}
+
+// PutAppRecord stores an encrypted app record by ID.
+func (s *Store) PutAppRecord(id string, data []byte) error {
+	if s.key == nil {
+		return ErrNotInitialized
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(appsBucket)
+		if err != nil {
+			return fmt.Errorf("creating apps bucket: %w", err)
+		}
+		encrypted, err := crypto.Encrypt(s.key, data)
+		if err != nil {
+			return fmt.Errorf("encrypting app record: %w", err)
+		}
+		return b.Put([]byte(id), encrypted)
+	})
+}
+
+// GetAppRecord retrieves and decrypts an app record by ID.
+func (s *Store) GetAppRecord(id string) ([]byte, error) {
+	if s.key == nil {
+		return nil, ErrNotInitialized
+	}
+	var result []byte
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(appsBucket)
+		if b == nil {
+			return ErrNotFound
+		}
+		data := b.Get([]byte(id))
+		if data == nil {
+			return ErrNotFound
+		}
+		decrypted, err := crypto.Decrypt(s.key, data)
+		if err != nil {
+			return fmt.Errorf("decrypting app record: %w", err)
+		}
+		result = decrypted
+		return nil
+	})
+	return result, err
+}
+
+// DeleteAppRecord removes an app record by ID.
+func (s *Store) DeleteAppRecord(id string) error {
+	if s.key == nil {
+		return ErrNotInitialized
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(appsBucket)
+		if b == nil {
+			return ErrNotFound
+		}
+		if b.Get([]byte(id)) == nil {
+			return ErrNotFound
+		}
+		return b.Delete([]byte(id))
+	})
+}
+
+// ListAppRecords returns all app records (decrypted) keyed by ID.
+func (s *Store) ListAppRecords() (map[string][]byte, error) {
+	if s.key == nil {
+		return nil, ErrNotInitialized
+	}
+	records := make(map[string][]byte)
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(appsBucket)
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(k, v []byte) error {
+			decrypted, err := crypto.Decrypt(s.key, v)
+			if err != nil {
+				return fmt.Errorf("decrypting app record %s: %w", k, err)
+			}
+			records[string(k)] = decrypted
+			return nil
+		})
+	})
+	return records, err
 }
 
 // Close closes the store.

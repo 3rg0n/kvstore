@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ecopelan/kvstoremon/internal/auth"
 	"github.com/ecopelan/kvstoremon/internal/config"
 	"github.com/ecopelan/kvstoremon/internal/server"
 	svc "github.com/ecopelan/kvstoremon/internal/service"
@@ -37,10 +38,20 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd, setCmd, getCmd, deleteCmd, listCmd, serveCmd, serviceCmd, versionCmd)
+	rootCmd.AddCommand(initCmd, setCmd, getCmd, deleteCmd, listCmd, serveCmd, serviceCmd, versionCmd, appCmd)
 
 	getCmd.Flags().Bool("json", false, "output in JSON format")
 	serveCmd.Flags().StringP("addr", "a", config.DefaultAddr, "listen address")
+
+	appRegisterCmd.Flags().String("binary", "", "path to the application binary (required)")
+	appRegisterCmd.Flags().StringSlice("namespaces", nil, "allowed namespaces (comma-separated, required)")
+	appRegisterCmd.Flags().String("name", "", "friendly name for the app (defaults to binary filename)")
+	appRegisterCmd.Flags().String("verify", "auto", "verification mode: hash, signature, or auto")
+	_ = appRegisterCmd.MarkFlagRequired("binary")
+	_ = appRegisterCmd.MarkFlagRequired("namespaces")
+
+	appUpdateNsCmd.Flags().StringSlice("namespaces", nil, "new allowed namespaces (comma-separated, required)")
+	_ = appUpdateNsCmd.MarkFlagRequired("namespaces")
 }
 
 // --- helpers ---
@@ -409,6 +420,214 @@ var serviceStatusCmd = &cobra.Command{
 		default:
 			fmt.Println("unknown")
 		}
+		return nil
+	},
+}
+
+// --- app management ---
+
+var appCmd = &cobra.Command{
+	Use:   "app",
+	Short: "Manage registered applications",
+}
+
+func init() {
+	appCmd.AddCommand(appRegisterCmd, appListCmd, appRevokeCmd, appRehashCmd, appUpdateNsCmd)
+}
+
+var appRegisterCmd = &cobra.Command{
+	Use:   "register",
+	Short: "Register an application for API access",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := openAndUnlock()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		binaryPath, _ := cmd.Flags().GetString("binary")
+		namespaces, _ := cmd.Flags().GetStringSlice("namespaces")
+		name, _ := cmd.Flags().GetString("name")
+		verifyStr, _ := cmd.Flags().GetString("verify")
+
+		var mode auth.VerifyMode
+		switch verifyStr {
+		case "hash":
+			mode = auth.VerifyHash
+		case "signature":
+			mode = auth.VerifySignature
+		case "auto":
+			mode = auth.VerifyAuto
+		default:
+			return fmt.Errorf("invalid verify mode %q: must be hash, signature, or auto", verifyStr)
+		}
+
+		// Biometric placeholder: confirm with master password
+		fmt.Fprintln(os.Stderr, "Confirm identity to register app:")
+		pw, err := readPassword("Enter master password: ")
+		if err != nil {
+			return err
+		}
+		if err := s.Unlock(pw); err != nil {
+			return fmt.Errorf("identity confirmation failed: %w", err)
+		}
+
+		reg := auth.NewRegistry(s)
+		token, err := reg.Register(name, binaryPath, namespaces, mode)
+		if err != nil {
+			return err
+		}
+
+		// Show the registered app details
+		apps, err := reg.List()
+		if err != nil {
+			return err
+		}
+		for _, app := range apps {
+			if app.TokenHash == "" {
+				continue
+			}
+			// Find the just-registered app (most recent)
+			if app.Name == name || (name == "" && app.BinaryPath != "") {
+				fmt.Fprintf(os.Stderr, "Registered app %q (ID: %s)\n", app.Name, app.ID)
+				fmt.Fprintf(os.Stderr, "  Binary:     %s\n", app.BinaryPath)
+				fmt.Fprintf(os.Stderr, "  Verify:     %s\n", app.VerifyMode)
+				if app.VerifyMode == auth.VerifyHash {
+					fmt.Fprintf(os.Stderr, "  Hash:       %s\n", app.BinaryHash)
+				} else {
+					fmt.Fprintf(os.Stderr, "  Signer:     %s\n", app.SignerID)
+				}
+				fmt.Fprintf(os.Stderr, "  Namespaces: %s\n", strings.Join(app.Namespaces, ", "))
+				break
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "\nApp token (save this, shown only once):\n")
+		fmt.Println(token)
+		return nil
+	},
+}
+
+var appListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List registered applications",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := openAndUnlock()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		reg := auth.NewRegistry(s)
+		apps, err := reg.List()
+		if err != nil {
+			return err
+		}
+
+		if len(apps) == 0 {
+			fmt.Fprintln(os.Stderr, "No registered apps.")
+			return nil
+		}
+
+		for _, app := range apps {
+			fmt.Printf("%-36s  %-20s  %-10s  %s\n",
+				app.ID, app.Name, app.VerifyMode, strings.Join(app.Namespaces, ","))
+		}
+		return nil
+	},
+}
+
+var appRevokeCmd = &cobra.Command{
+	Use:   "revoke <app-id>",
+	Short: "Revoke an application's access",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := openAndUnlock()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		// Biometric placeholder: confirm with master password
+		fmt.Fprintln(os.Stderr, "Confirm identity to revoke app:")
+		pw, err := readPassword("Enter master password: ")
+		if err != nil {
+			return err
+		}
+		if err := s.Unlock(pw); err != nil {
+			return fmt.Errorf("identity confirmation failed: %w", err)
+		}
+
+		reg := auth.NewRegistry(s)
+		if err := reg.Revoke(args[0]); err != nil {
+			return err
+		}
+
+		fmt.Fprintf(os.Stderr, "App %s revoked.\n", args[0])
+		return nil
+	},
+}
+
+var appRehashCmd = &cobra.Command{
+	Use:   "rehash <app-id>",
+	Short: "Re-hash a binary after update (hash mode only)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := openAndUnlock()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		// Biometric placeholder: confirm with master password
+		fmt.Fprintln(os.Stderr, "Confirm identity to rehash app:")
+		pw, err := readPassword("Enter master password: ")
+		if err != nil {
+			return err
+		}
+		if err := s.Unlock(pw); err != nil {
+			return fmt.Errorf("identity confirmation failed: %w", err)
+		}
+
+		reg := auth.NewRegistry(s)
+		if err := reg.Rehash(args[0]); err != nil {
+			return err
+		}
+
+		fmt.Fprintf(os.Stderr, "App %s rehashed.\n", args[0])
+		return nil
+	},
+}
+
+var appUpdateNsCmd = &cobra.Command{
+	Use:   "update-ns <app-id>",
+	Short: "Update namespace ACLs for an application",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s, err := openAndUnlock()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = s.Close() }()
+
+		namespaces, _ := cmd.Flags().GetStringSlice("namespaces")
+
+		// Biometric placeholder: confirm with master password
+		fmt.Fprintln(os.Stderr, "Confirm identity to update namespace ACLs:")
+		pw, err := readPassword("Enter master password: ")
+		if err != nil {
+			return err
+		}
+		if err := s.Unlock(pw); err != nil {
+			return fmt.Errorf("identity confirmation failed: %w", err)
+		}
+
+		reg := auth.NewRegistry(s)
+		if err := reg.UpdateNamespaces(args[0], namespaces); err != nil {
+			return err
+		}
+
+		fmt.Fprintf(os.Stderr, "App %s namespaces updated to: %s\n", args[0], strings.Join(namespaces, ", "))
 		return nil
 	},
 }
