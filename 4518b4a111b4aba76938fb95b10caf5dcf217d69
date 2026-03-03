@@ -1,0 +1,39 @@
+internal/store/store.go
+  7864934018b48233 23-24,26-28,123-230
+internal/platform/platform_linux.go
+  7864934018b48233 93-113
+.tasks/step5-tpm.md
+  7864934018b48233 1-27
+internal/platform/platform.go
+  7864934018b48233 27-37
+internal/platform/platform_darwin.go
+  7864934018b48233 124-144
+cmd/kvstoremon/main.go
+  7864934018b48233 46,120-129,164-182
+internal/platform/platform_windows.go
+  7864934018b48233 116-136
+internal/store/store_test.go
+  7864934018b48233 182-267
+internal/platform/tpm_stub.go
+  7864934018b48233 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "4518b4a111b4aba76938fb95b10caf5dcf217d69",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 354,
+      "total_deletions": 0,
+      "accepted_lines": 354,
+      "overriden_lines": 0
+    }
+  }
+}
