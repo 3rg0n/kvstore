@@ -24,4 +24,15 @@ type Platform interface {
 
 	// HasBiometric reports whether the platform has a usable biometric mechanism.
 	HasBiometric() bool
+
+	// TPMSeal encrypts data using the platform's hardware security module
+	// (TPM 2.0 on Windows/Linux, Secure Enclave on macOS). The sealed blob
+	// can only be decrypted on the same hardware.
+	TPMSeal(data []byte) ([]byte, error)
+
+	// TPMUnseal decrypts a blob previously sealed with TPMSeal.
+	TPMUnseal(sealed []byte) ([]byte, error)
+
+	// HasTPM reports whether a hardware security module is available.
+	HasTPM() bool
 }

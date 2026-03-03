@@ -43,6 +43,7 @@ func init() {
 	rootCmd.AddCommand(initCmd, setCmd, getCmd, deleteCmd, listCmd, serveCmd, serviceCmd, versionCmd, appCmd)
 
 	getCmd.Flags().Bool("json", false, "output in JSON format")
+	initCmd.Flags().Bool("tpm", false, "seal master key with TPM/Secure Enclave (auto-detected if omitted)")
 	serveCmd.Flags().StringP("addr", "a", config.DefaultAddr, "listen address")
 	serveCmd.Flags().Bool("no-auth", false, "disable app token authentication (development/migration only)")
 
@@ -116,6 +117,16 @@ func openAndUnlock() (*store.Store, error) {
 		return nil, store.ErrNotInitialized
 	}
 
+	// Auto-detect TPM mode
+	if s.IsTPMMode() {
+		plat := platform.New()
+		if err := s.UnlockTPM(plat); err != nil {
+			_ = s.Close()
+			return nil, fmt.Errorf("TPM unlock: %w", err)
+		}
+		return s, nil
+	}
+
 	pw, err := getPassword()
 	if err != nil {
 		_ = s.Close()
@@ -148,6 +159,25 @@ var initCmd = &cobra.Command{
 
 		if s.IsInitialized() {
 			return errors.New("store already initialized")
+		}
+
+		useTPM, _ := cmd.Flags().GetBool("tpm")
+		plat := platform.New()
+
+		// Auto-detect TPM if flag not explicitly set
+		if !cmd.Flags().Changed("tpm") && plat.HasTPM() {
+			fmt.Fprintln(os.Stderr, "TPM detected. Use --tpm to seal master key with hardware.")
+		}
+
+		if useTPM {
+			if !plat.HasTPM() {
+				return errors.New("TPM not available on this system")
+			}
+			if err := s.InitTPM(plat); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Store initialized with TPM-sealed key at %s\n", config.StorePath())
+			return nil
 		}
 
 		pw1, err := readPassword("Enter master password: ")

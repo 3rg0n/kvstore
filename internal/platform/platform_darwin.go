@@ -121,3 +121,24 @@ func (d *Darwin) HasBiometric() bool {
 	// swift -e 'import LocalAuthentication; print(LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil))'
 	return true
 }
+
+// TPMSeal seals data using the macOS Secure Enclave.
+//
+// macOS has no TPM. A full implementation would use the Secure Enclave
+// via a swift helper for hardware-bound key storage, or Keychain with
+// biometric ACL. For now this is a stub placeholder.
+func (d *Darwin) TPMSeal(data []byte) ([]byte, error) {
+	// TODO: Implement Secure Enclave key storage via swift helper
+	return tpmSealStub(data), nil
+}
+
+// TPMUnseal reverses a TPMSeal operation.
+func (d *Darwin) TPMUnseal(sealed []byte) ([]byte, error) {
+	return tpmUnsealStub(sealed), nil
+}
+
+// HasTPM reports whether hardware key storage (Secure Enclave) is available.
+func (d *Darwin) HasTPM() bool {
+	// TODO: Check for Secure Enclave availability
+	return false
+}

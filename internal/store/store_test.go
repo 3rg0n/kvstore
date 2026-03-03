@@ -179,6 +179,92 @@ func TestSetPreservesCreatedAt(t *testing.T) {
 	}
 }
 
+// mockSealer implements KeySealer for tests using simple XOR.
+type mockSealer struct{}
+
+func (m *mockSealer) TPMSeal(data []byte) ([]byte, error) {
+	out := make([]byte, len(data))
+	for i, b := range data {
+		out[i] = b ^ 0xAA
+	}
+	return out, nil
+}
+
+func (m *mockSealer) TPMUnseal(sealed []byte) ([]byte, error) {
+	return m.TPMSeal(sealed) // XOR is its own inverse
+}
+
+func TestInitTPMAndUnlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	sealer := &mockSealer{}
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	if err := s.InitTPM(sealer); err != nil {
+		t.Fatalf("InitTPM: %v", err)
+	}
+
+	if !s.IsTPMMode() {
+		t.Fatal("expected TPM mode after InitTPM")
+	}
+
+	// Can use the store after InitTPM
+	if err := s.Set("ns", "key", []byte("value")); err != nil {
+		t.Fatalf("Set after InitTPM: %v", err)
+	}
+	_ = s.Close()
+
+	// Reopen and unlock with TPM
+	s, err = Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if !s.IsTPMMode() {
+		t.Fatal("should still be TPM mode after reopen")
+	}
+
+	if err := s.UnlockTPM(sealer); err != nil {
+		t.Fatalf("UnlockTPM: %v", err)
+	}
+
+	entry, err := s.Get("ns", "key")
+	if err != nil {
+		t.Fatalf("Get after UnlockTPM: %v", err)
+	}
+	if string(entry.Value) != "value" {
+		t.Fatalf("got %q, want %q", entry.Value, "value")
+	}
+}
+
+func TestPasswordModeNotTPM(t *testing.T) {
+	s := testStore(t)
+	if s.IsTPMMode() {
+		t.Fatal("password-initialized store should not be TPM mode")
+	}
+}
+
+func TestDoubleInitTPM(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	sealer := &mockSealer{}
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if err := s.InitTPM(sealer); err != nil {
+		t.Fatalf("InitTPM: %v", err)
+	}
+	if err := s.InitTPM(sealer); err != ErrAlreadyInit {
+		t.Fatalf("expected ErrAlreadyInit, got: %v", err)
+	}
+}
+
 func TestNotInitialized(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.db")
 	s, err := Open(path)

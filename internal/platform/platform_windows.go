@@ -113,3 +113,24 @@ func (w *Windows) HasBiometric() bool {
 	// Stub: assume available on Windows 10+
 	return true
 }
+
+// TPMSeal seals data using TPM 2.0 via the Windows TBS interface.
+//
+// A full implementation would use google/go-tpm-tools to seal a key to
+// the TPM's storage root key (SRK). For now this is a stub that uses
+// a simple XOR obfuscation as a placeholder — not secure, only structural.
+func (w *Windows) TPMSeal(data []byte) ([]byte, error) {
+	// TODO: Integrate google/go-tpm-tools for real TPM sealing
+	return tpmSealStub(data), nil
+}
+
+// TPMUnseal reverses a TPMSeal operation.
+func (w *Windows) TPMUnseal(sealed []byte) ([]byte, error) {
+	return tpmUnsealStub(sealed), nil
+}
+
+// HasTPM reports whether TPM 2.0 is available via Windows TBS.
+func (w *Windows) HasTPM() bool {
+	// TODO: Check for TPM via TBS (Trusted Platform Base Services)
+	return false
+}

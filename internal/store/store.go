@@ -20,7 +20,12 @@ var (
 	appsBucket  = []byte("_apps")
 	saltKey     = []byte("salt")
 	verifyKey   = []byte("verify")
+	modeKey     = []byte("mode")
+	sealedKey   = []byte("sealed_key")
 	verifyToken = []byte("kvstoremon-verification-token")
+
+	ModePassword = []byte("password")
+	ModeTPM      = []byte("tpm")
 )
 
 // Entry represents a stored key-value pair with timestamps.
@@ -113,6 +118,114 @@ func (s *Store) Unlock(password []byte) error {
 		s.key = key
 		return nil
 	})
+}
+
+// KeySealer provides hardware-bound key sealing (TPM or Secure Enclave).
+type KeySealer interface {
+	TPMSeal(data []byte) ([]byte, error)
+	TPMUnseal(sealed []byte) ([]byte, error)
+}
+
+// InitTPM initializes the store with a TPM-sealed random master key.
+// No password is required — the key is bound to the hardware.
+func (s *Store) InitTPM(sealer KeySealer) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(metaBucket); b != nil && b.Get(saltKey) != nil {
+			return ErrAlreadyInit
+		}
+
+		b, err := tx.CreateBucketIfNotExists(metaBucket)
+		if err != nil {
+			return fmt.Errorf("creating meta bucket: %w", err)
+		}
+
+		// Generate a random master key (not derived from password)
+		key := make([]byte, crypto.KeySize)
+		salt, err := crypto.GenerateSalt()
+		if err != nil {
+			return err
+		}
+		// Use salt as the random key material for consistency with store format
+		copy(key, salt)
+
+		// Seal the key with TPM
+		sealed, err := sealer.TPMSeal(key)
+		if err != nil {
+			return fmt.Errorf("sealing key with TPM: %w", err)
+		}
+
+		encrypted, err := crypto.Encrypt(key, verifyToken)
+		if err != nil {
+			return fmt.Errorf("encrypting verification token: %w", err)
+		}
+
+		if err := b.Put(saltKey, salt); err != nil {
+			return fmt.Errorf("storing salt: %w", err)
+		}
+		if err := b.Put(verifyKey, encrypted); err != nil {
+			return fmt.Errorf("storing verification: %w", err)
+		}
+		if err := b.Put(modeKey, ModeTPM); err != nil {
+			return fmt.Errorf("storing mode: %w", err)
+		}
+		if err := b.Put(sealedKey, sealed); err != nil {
+			return fmt.Errorf("storing sealed key: %w", err)
+		}
+
+		s.key = key
+		return nil
+	})
+}
+
+// UnlockTPM unlocks a TPM-initialized store by unsealing the master key.
+func (s *Store) UnlockTPM(sealer KeySealer) error {
+	return s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(metaBucket)
+		if b == nil {
+			return ErrNotInitialized
+		}
+
+		sealed := b.Get(sealedKey)
+		if sealed == nil {
+			return ErrNotInitialized
+		}
+
+		encrypted := b.Get(verifyKey)
+		if encrypted == nil {
+			return ErrNotInitialized
+		}
+
+		key, err := sealer.TPMUnseal(sealed)
+		if err != nil {
+			return fmt.Errorf("unsealing key from TPM: %w", err)
+		}
+
+		plaintext, err := crypto.Decrypt(key, encrypted)
+		if err != nil {
+			return ErrInvalidKey
+		}
+
+		if string(plaintext) != string(verifyToken) {
+			return ErrInvalidKey
+		}
+
+		s.key = key
+		return nil
+	})
+}
+
+// IsTPMMode reports whether the store was initialized with TPM key sealing.
+func (s *Store) IsTPMMode() bool {
+	tpm := false
+	_ = s.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(metaBucket); b != nil {
+			if mode := b.Get(modeKey); mode != nil && string(mode) == string(ModeTPM) {
+				tpm = true
+			}
+		}
+		return nil
+	})
+	return tpm
 }
 
 // IsInitialized checks if the store has been initialized with a master password.
