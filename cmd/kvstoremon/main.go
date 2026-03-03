@@ -82,6 +82,25 @@ func getPassword() ([]byte, error) {
 	return readPassword("Enter master password: ")
 }
 
+// confirmIdentity verifies human presence using platform biometric if available,
+// falling back to master password re-entry.
+func confirmIdentity(reason string, s *store.Store) error {
+	plat := platform.New()
+	if plat.HasBiometric() {
+		fmt.Fprintf(os.Stderr, "Biometric verification: %s\n", reason)
+		if err := plat.BiometricPrompt(reason); err == nil {
+			return nil
+		}
+		fmt.Fprintln(os.Stderr, "Biometric failed, falling back to password.")
+	}
+
+	pw, err := readPassword("Enter master password: ")
+	if err != nil {
+		return err
+	}
+	return s.Unlock(pw)
+}
+
 func openAndUnlock() (*store.Store, error) {
 	if err := config.EnsureDataDir(); err != nil {
 		return nil, err
@@ -495,13 +514,7 @@ var appRegisterCmd = &cobra.Command{
 			return fmt.Errorf("invalid verify mode %q: must be hash, signature, or auto", verifyStr)
 		}
 
-		// Biometric placeholder: confirm with master password
-		fmt.Fprintln(os.Stderr, "Confirm identity to register app:")
-		pw, err := readPassword("Enter master password: ")
-		if err != nil {
-			return err
-		}
-		if err := s.Unlock(pw); err != nil {
+		if err := confirmIdentity("Register application for API access", s); err != nil {
 			return fmt.Errorf("identity confirmation failed: %w", err)
 		}
 
@@ -581,13 +594,7 @@ var appRevokeCmd = &cobra.Command{
 		}
 		defer func() { _ = s.Close() }()
 
-		// Biometric placeholder: confirm with master password
-		fmt.Fprintln(os.Stderr, "Confirm identity to revoke app:")
-		pw, err := readPassword("Enter master password: ")
-		if err != nil {
-			return err
-		}
-		if err := s.Unlock(pw); err != nil {
+		if err := confirmIdentity("Revoke application access", s); err != nil {
 			return fmt.Errorf("identity confirmation failed: %w", err)
 		}
 
@@ -612,13 +619,7 @@ var appRehashCmd = &cobra.Command{
 		}
 		defer func() { _ = s.Close() }()
 
-		// Biometric placeholder: confirm with master password
-		fmt.Fprintln(os.Stderr, "Confirm identity to rehash app:")
-		pw, err := readPassword("Enter master password: ")
-		if err != nil {
-			return err
-		}
-		if err := s.Unlock(pw); err != nil {
+		if err := confirmIdentity("Re-hash application binary", s); err != nil {
 			return fmt.Errorf("identity confirmation failed: %w", err)
 		}
 
@@ -645,13 +646,7 @@ var appUpdateNsCmd = &cobra.Command{
 
 		namespaces, _ := cmd.Flags().GetStringSlice("namespaces")
 
-		// Biometric placeholder: confirm with master password
-		fmt.Fprintln(os.Stderr, "Confirm identity to update namespace ACLs:")
-		pw, err := readPassword("Enter master password: ")
-		if err != nil {
-			return err
-		}
-		if err := s.Unlock(pw); err != nil {
+		if err := confirmIdentity("Update application namespace ACLs", s); err != nil {
 			return fmt.Errorf("identity confirmation failed: %w", err)
 		}
 

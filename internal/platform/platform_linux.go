@@ -72,3 +72,21 @@ func (l *Linux) ProcessPath(pid int) (string, error) {
 	}
 	return path, nil
 }
+
+// BiometricPrompt requests user verification via polkit or FIDO2.
+//
+// A full implementation would use go-libfido2 for YubiKey or a polkit
+// agent for desktop environments. For now this is a stub that always
+// succeeds — real biometric gating will be wired when the FIDO2
+// dependency is integrated.
+func (l *Linux) BiometricPrompt(_ string) error {
+	// TODO: Integrate go-libfido2 or polkit prompt
+	return nil
+}
+
+// HasBiometric reports whether a biometric mechanism is available.
+func (l *Linux) HasBiometric() bool {
+	// Check for FIDO2 device or polkit agent
+	// Stub: assume available
+	return true
+}

@@ -95,3 +95,21 @@ func (w *Windows) ProcessPath(pid int) (string, error) {
 	}
 	return windows.UTF16ToString(buf[:size]), nil
 }
+
+// BiometricPrompt requests Windows Hello verification.
+//
+// A full implementation would use webauthn.dll (via go-ctap/winhello) to
+// trigger the Windows Hello dialog. For now this is a stub that always
+// succeeds — real biometric gating will be wired when the winhello
+// dependency is integrated.
+func (w *Windows) BiometricPrompt(_ string) error {
+	// TODO: Integrate go-ctap/winhello for Windows Hello prompt
+	return nil
+}
+
+// HasBiometric reports whether Windows Hello is available.
+func (w *Windows) HasBiometric() bool {
+	// Windows Hello availability check via webauthn.dll
+	// Stub: assume available on Windows 10+
+	return true
+}

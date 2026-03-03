@@ -38,6 +38,20 @@ func TestProcessPathSelf(t *testing.T) {
 	}
 }
 
+func TestHasBiometric(t *testing.T) {
+	p := New()
+	// HasBiometric should return a bool without panicking
+	_ = p.HasBiometric()
+}
+
+func TestBiometricPromptStub(t *testing.T) {
+	p := New()
+	// Stub should succeed without error
+	if err := p.BiometricPrompt("test verification"); err != nil {
+		t.Fatalf("BiometricPrompt: %v", err)
+	}
+}
+
 func TestListenerStub(t *testing.T) {
 	p := New()
 
