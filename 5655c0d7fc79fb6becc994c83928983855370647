@@ -1,0 +1,31 @@
+internal/store/store.go
+  7864934018b48233 20,248,257-339
+internal/auth/registry.go
+  7864934018b48233 1-314
+cmd/kvstoremon/main.go
+  7864934018b48233 15,41,45-54,427-634
+internal/auth/registry_test.go
+  7864934018b48233 1-443
+.tasks/step1-app-registry.md
+  7864934018b48233 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "5655c0d7fc79fb6becc994c83928983855370647",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1088,
+      "total_deletions": 4,
+      "accepted_lines": 1086,
+      "overriden_lines": 0
+    }
+  }
+}
