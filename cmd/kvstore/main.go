@@ -46,6 +46,7 @@ func init() {
 	initCmd.Flags().Bool("tpm", false, "seal master key with TPM/Secure Enclave (auto-detected if omitted)")
 	serveCmd.Flags().StringP("addr", "a", config.DefaultAddr, "listen address")
 	serveCmd.Flags().Bool("no-auth", false, "disable app token authentication (development/migration only)")
+	serveCmd.Flags().Bool("debug", false, "enable debug-level NDJSON logging")
 
 	appRegisterCmd.Flags().String("binary", "", "path to the application binary (required)")
 	appRegisterCmd.Flags().StringSlice("namespaces", nil, "allowed namespaces (comma-separated, required)")
@@ -60,6 +61,10 @@ func init() {
 
 // --- helpers ---
 
+// stdinReader is shared across non-terminal readPassword calls so that
+// buffered data (e.g. piped input with multiple lines) isn't lost.
+var stdinReader = bufio.NewReader(os.Stdin)
+
 func readPassword(prompt string) ([]byte, error) {
 	fmt.Fprint(os.Stderr, prompt)
 	fd := int(os.Stdin.Fd()) //nolint:gosec // fd fits in int on all supported platforms
@@ -68,8 +73,7 @@ func readPassword(prompt string) ([]byte, error) {
 		fmt.Fprintln(os.Stderr)
 		return pw, err
 	}
-	reader := bufio.NewReader(os.Stdin)
-	line, err := reader.ReadString('\n')
+	line, err := stdinReader.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +324,7 @@ var listCmd = &cobra.Command{
 type serveProgram struct {
 	addr   string
 	noAuth bool
+	debug  bool
 	srv    *server.Server
 	store  *store.Store
 	logger *slog.Logger
@@ -332,7 +337,11 @@ func (p *serveProgram) Start(_ service.Service) error {
 		return err
 	}
 
-	p.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logLevel := slog.LevelInfo
+	if p.debug {
+		logLevel = slog.LevelDebug
+	}
+	p.logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
 	var authMw *auth.Middleware
 	var ln net.Listener
@@ -342,11 +351,18 @@ func (p *serveProgram) Start(_ service.Service) error {
 		reg := auth.NewRegistry(p.store)
 		authMw = auth.NewMiddleware(reg, plat, p.logger)
 
+		// Try platform-native IPC listener (named pipe / Unix socket).
+		// If --addr was explicitly provided, prefer TCP on that address so
+		// the port is predictable (important for testing and scripts).
 		sockPath := config.SocketPath()
-		ln, err = plat.Listener(sockPath)
-		if err != nil {
-			p.logger.Warn("platform listener failed, falling back to TCP",
-				"err", err, "addr", p.addr)
+		if p.addr == config.DefaultAddr {
+			ln, err = plat.Listener(sockPath)
+			if err != nil {
+				p.logger.Warn("platform listener failed, falling back to TCP",
+					"err", err, "addr", p.addr)
+			}
+		}
+		if ln == nil {
 			ln, err = net.Listen("tcp", p.addr)
 			if err != nil {
 				return fmt.Errorf("listen: %w", err)
@@ -393,7 +409,9 @@ var serveCmd = &cobra.Command{
 		addr, _ := cmd.Flags().GetString("addr")
 		noAuth, _ := cmd.Flags().GetBool("no-auth")
 
-		prg := &serveProgram{addr: addr, noAuth: noAuth}
+		debug, _ := cmd.Flags().GetBool("debug")
+
+		prg := &serveProgram{addr: addr, noAuth: noAuth, debug: debug}
 
 		svcCfg := &service.Config{
 			Name: "kvstore",

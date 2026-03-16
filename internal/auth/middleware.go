@@ -50,18 +50,29 @@ func ConnContext(ctx context.Context, conn net.Conn) context.Context {
 func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := extractBearerToken(r)
+		namespace := r.PathValue("namespace")
+
+		m.logger.Debug("auth.request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"token_present", token != "",
+			"namespace", namespace)
+
 		if token == "" {
+			m.logger.Debug("auth.denied", "reason", "missing token")
 			writeAuthError(w, http.StatusUnauthorized, "missing or invalid Authorization header")
 			return
 		}
-
-		namespace := r.PathValue("namespace")
 
 		// Attempt to resolve caller binary path via process attestation
 		binaryPath := m.resolveBinaryPath(r.Context())
 
 		rec, err := m.registry.Verify(token, binaryPath, namespace)
 		if err != nil {
+			m.logger.Debug("auth.denied",
+				"reason", err.Error(),
+				"namespace", namespace,
+				"binary_resolved", binaryPath != "")
 			switch err {
 			case ErrInvalidToken:
 				writeAuthError(w, http.StatusUnauthorized, "invalid token")
@@ -74,6 +85,13 @@ func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			}
 			return
 		}
+
+		m.logger.Debug("auth.allowed",
+			"app_id", rec.ID,
+			"app_name", rec.Name,
+			"namespace", namespace,
+			"verify_mode", rec.VerifyMode,
+			"binary_resolved", binaryPath != "")
 
 		ctx := context.WithValue(r.Context(), appRecordCtxKey, rec)
 		next(w, r.WithContext(ctx))
@@ -94,16 +112,17 @@ func (m *Middleware) resolveBinaryPath(ctx context.Context) string {
 
 	pid, err := m.verifier.PeerPID(conn)
 	if err != nil {
-		m.logger.Debug("PeerPID failed", "err", err)
+		m.logger.Debug("auth.binary_resolve", "step", "PeerPID", "err", err)
 		return ""
 	}
 
 	path, err := m.verifier.ProcessPath(pid)
 	if err != nil {
-		m.logger.Debug("ProcessPath failed", "pid", pid, "err", err)
+		m.logger.Debug("auth.binary_resolve", "step", "ProcessPath", "pid", pid, "err", err)
 		return ""
 	}
 
+	m.logger.Debug("auth.binary_resolve", "pid", pid, "path", path)
 	return path
 }
 

@@ -2,7 +2,7 @@ BINARY := kvstore
 VERSION ?= 0.1.0
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
-.PHONY: build build-all test lint vet clean
+.PHONY: build build-all test test-e2e lint vet clean
 
 build:
 	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/kvstore
@@ -17,6 +17,9 @@ build-all:
 
 test:
 	go test ./... -v -race -count=1
+
+test-e2e: build
+	bash test/e2e.sh
 
 lint:
 	golangci-lint run ./...

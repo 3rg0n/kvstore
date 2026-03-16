@@ -61,12 +61,12 @@ func New(s *store.Store, logger *slog.Logger, authMw *auth.Middleware) *Server {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", srv.handleHealth)
-	mux.HandleFunc("GET /api/v1/kv", wrap(srv.handleListNamespaces))
-	mux.HandleFunc("GET /api/v1/kv/{namespace}", wrap(srv.handleList))
-	mux.HandleFunc("GET /api/v1/kv/{namespace}/{key}", wrap(srv.handleGet))
-	mux.HandleFunc("PUT /api/v1/kv/{namespace}/{key}", wrap(srv.handleSet))
-	mux.HandleFunc("DELETE /api/v1/kv/{namespace}/{key}", wrap(srv.handleDelete))
+	mux.HandleFunc("GET /api/v1/health", srv.withLog(srv.handleHealth))
+	mux.HandleFunc("GET /api/v1/kv", srv.withLog(wrap(srv.handleListNamespaces)))
+	mux.HandleFunc("GET /api/v1/kv/{namespace}", srv.withLog(wrap(srv.handleList)))
+	mux.HandleFunc("GET /api/v1/kv/{namespace}/{key}", srv.withLog(wrap(srv.handleGet)))
+	mux.HandleFunc("PUT /api/v1/kv/{namespace}/{key}", srv.withLog(wrap(srv.handleSet)))
+	mux.HandleFunc("DELETE /api/v1/kv/{namespace}/{key}", srv.withLog(wrap(srv.handleDelete)))
 
 	httpSrv := &http.Server{
 		Handler:      mux,
@@ -194,6 +194,29 @@ func (s *Server) handleListNamespaces(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, namespacesResponse{Namespaces: namespaces})
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (s *Server) withLog(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		start := time.Now()
+		next(sw, r)
+		s.logger.Debug("http.request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", sw.status,
+			"duration_ms", time.Since(start).Milliseconds())
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
