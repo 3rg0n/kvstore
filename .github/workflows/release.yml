@@ -46,13 +46,13 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           go build -ldflags "-s -w -X main.version=${VERSION}" \
-            -o kvstoremon-${{ matrix.suffix }} ./cmd/kvstoremon
+            -o kvstore-${{ matrix.suffix }} ./cmd/kvstore
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kvstoremon-${{ matrix.suffix }}
-          path: kvstoremon-${{ matrix.suffix }}
+          name: kvstore-${{ matrix.suffix }}
+          path: kvstore-${{ matrix.suffix }}
 
   release:
     needs: build

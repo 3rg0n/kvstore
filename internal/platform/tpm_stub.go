@@ -8,7 +8,7 @@ package platform
 // The stub uses a fixed XOR key so that seal/unseal round-trips correctly.
 // Real TPM sealing binds data to the hardware's storage root key (SRK).
 
-var tpmStubKey = []byte("kvstoremon-tpm-stub-placeholder!") // 32 bytes
+var tpmStubKey = []byte("kvstore-tpm-stub-placeholder!") // 32 bytes
 
 func tpmSealStub(data []byte) []byte {
 	out := make([]byte, len(data))

@@ -8,7 +8,7 @@
 - `internal/auth/registry.go` — Updated `Verify`: skips binary check when binaryPath is empty, skips namespace ACL when namespace is empty. Enables token-only verification before platform process attestation (Step 3).
 - `internal/server/server.go` — `New()` now accepts `*auth.Middleware`. When non-nil, all KV routes are wrapped with `RequireAuth`. Health endpoint stays unauthenticated.
 - `internal/server/server_test.go` — Updated to pass `nil` middleware (no auth in existing tests).
-- `cmd/kvstoremon/main.go` — Added `--no-auth` flag to `serve` command. When not set, creates registry + middleware. Logs auth status on startup.
+- `cmd/kvstore/main.go` — Added `--no-auth` flag to `serve` command. When not set, creates registry + middleware. Logs auth status on startup.
 
 ## Design Decisions
 - **Binary verification deferred**: Middleware passes empty binaryPath to Verify, skipping binary hash check. Step 3 will wire in real process attestation via platform listeners.
@@ -19,4 +19,4 @@
 ## Verification
 - `go test ./... -race -count=1` — All tests pass (26 auth + 9 store + 6 server)
 - `golangci-lint run ./...` — 0 issues
-- `go build ./cmd/kvstoremon/` — builds clean
+- `go build ./cmd/kvstore/` — builds clean

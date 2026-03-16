@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ecopelan/kvstoremon/internal/auth"
-	"github.com/ecopelan/kvstoremon/internal/config"
-	"github.com/ecopelan/kvstoremon/internal/platform"
-	"github.com/ecopelan/kvstoremon/internal/server"
-	svc "github.com/ecopelan/kvstoremon/internal/service"
-	"github.com/ecopelan/kvstoremon/internal/store"
+	"github.com/ecopelan/kvstore/internal/auth"
+	"github.com/ecopelan/kvstore/internal/config"
+	"github.com/ecopelan/kvstore/internal/platform"
+	"github.com/ecopelan/kvstore/internal/server"
+	svc "github.com/ecopelan/kvstore/internal/service"
+	"github.com/ecopelan/kvstore/internal/store"
 	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -33,7 +33,7 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:          "kvstoremon",
+	Use:          "kvstore",
 	Short:        "Lightweight encrypted key-value store",
 	Long:         "A cross-platform, TPM-ready encrypted key-value store for secrets and configuration management.",
 	SilenceUsage: true,
@@ -77,7 +77,7 @@ func readPassword(prompt string) ([]byte, error) {
 }
 
 func getPassword() ([]byte, error) {
-	if pw := os.Getenv("KVSTOREMON_KEY"); pw != "" {
+	if pw := os.Getenv("KVSTORE_KEY"); pw != "" {
 		return []byte(pw), nil
 	}
 	return readPassword("Enter master password: ")
@@ -396,7 +396,7 @@ var serveCmd = &cobra.Command{
 		prg := &serveProgram{addr: addr, noAuth: noAuth}
 
 		svcCfg := &service.Config{
-			Name: "kvstoremon",
+			Name: "kvstore",
 		}
 		s, err := service.New(prg, svcCfg)
 		if err != nil {
@@ -420,7 +420,7 @@ func init() {
 
 var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Install kvstoremon as a system service",
+	Short: "Install kvstore as a system service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		s, err := svc.New()
 		if err != nil {
@@ -429,7 +429,7 @@ var serviceInstallCmd = &cobra.Command{
 		if err := s.Install(); err != nil {
 			return err
 		}
-		fmt.Println("Service installed. Set KVSTOREMON_KEY env var before starting.")
+		fmt.Println("Service installed. Set KVSTORE_KEY env var before starting.")
 		return nil
 	},
 }
@@ -696,6 +696,6 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("kvstoremon %s\n", version)
+		fmt.Printf("kvstore %s\n", version)
 	},
 }

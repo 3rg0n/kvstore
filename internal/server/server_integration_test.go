@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ecopelan/kvstoremon/internal/auth"
-	"github.com/ecopelan/kvstoremon/internal/store"
+	"github.com/ecopelan/kvstore/internal/auth"
+	"github.com/ecopelan/kvstore/internal/store"
 )
 
 // TestIntegrationAuthFlow is an end-to-end test of the full auth pipeline:

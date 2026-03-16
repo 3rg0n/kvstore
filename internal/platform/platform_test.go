@@ -57,7 +57,7 @@ func TestListenerStub(t *testing.T) {
 
 	// On Windows, Listener currently returns a TCP stub.
 	// On Linux/Darwin, it creates a Unix socket.
-	ln, err := p.Listener("kvstoremon-test")
+	ln, err := p.Listener("kvstore-test")
 	if runtime.GOOS == "windows" {
 		// TCP stub
 		if err != nil {

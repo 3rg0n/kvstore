@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ecopelan/kvstoremon/internal/crypto"
+	"github.com/ecopelan/kvstore/internal/crypto"
 	bolt "go.etcd.io/bbolt"
 )
 
 var (
 	ErrNotFound       = errors.New("key not found")
-	ErrNotInitialized = errors.New("store not initialized: run 'kvstoremon init' first")
+	ErrNotInitialized = errors.New("store not initialized: run 'kvstore init' first")
 	ErrInvalidKey     = errors.New("invalid master key")
 	ErrAlreadyInit    = errors.New("store already initialized")
 
@@ -22,7 +22,7 @@ var (
 	verifyKey   = []byte("verify")
 	modeKey     = []byte("mode")
 	sealedKey   = []byte("sealed_key")
-	verifyToken = []byte("kvstoremon-verification-token")
+	verifyToken = []byte("kvstore-verification-token")
 
 	ModePassword = []byte("password")
 	ModeTPM      = []byte("tpm")

@@ -19,7 +19,7 @@ func New() Platform {
 }
 
 // Listener returns a named pipe listener. The path should be a pipe name
-// like "kvstoremon" which becomes \\.\pipe\kvstoremon.
+// like "kvstore" which becomes \\.\pipe\kvstore.
 //
 // Go's net package doesn't natively support named pipes. A production
 // implementation would use microsoft/go-winio. For now we use a localhost

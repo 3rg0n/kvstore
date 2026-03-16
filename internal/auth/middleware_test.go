@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ecopelan/kvstoremon/internal/store"
+	"github.com/ecopelan/kvstore/internal/store"
 )
 
 func setupMiddleware(t *testing.T) (*Middleware, string) {

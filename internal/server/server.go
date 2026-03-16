@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ecopelan/kvstoremon/internal/auth"
-	"github.com/ecopelan/kvstoremon/internal/store"
+	"github.com/ecopelan/kvstore/internal/auth"
+	"github.com/ecopelan/kvstore/internal/store"
 )
 
-// Server is the HTTP API server for kvstoremon.
+// Server is the HTTP API server for kvstore.
 type Server struct {
 	store  *store.Store
 	logger *slog.Logger

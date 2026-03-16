@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	AppName     = "kvstoremon"
+	AppName     = "kvstore"
 	DefaultAddr = "127.0.0.1:7390"
 )
 
 // DataDir returns the platform-specific data directory.
 func DataDir() string {
-	if dir := os.Getenv("KVSTOREMON_DATA_DIR"); dir != "" {
+	if dir := os.Getenv("KVSTORE_DATA_DIR"); dir != "" {
 		return dir
 	}
 
@@ -41,7 +41,7 @@ func StorePath() string {
 func SocketPath() string {
 	switch runtime.GOOS {
 	case "windows":
-		return AppName // becomes \\.\pipe\kvstoremon
+		return AppName // becomes \\.\pipe\kvstore
 	case "linux":
 		if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
 			return filepath.Join(xdg, AppName+".sock")

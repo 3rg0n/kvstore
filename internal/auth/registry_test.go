@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ecopelan/kvstoremon/internal/store"
+	"github.com/ecopelan/kvstore/internal/store"
 )
 
 func setupTestRegistry(t *testing.T) (*Registry, *store.Store) {

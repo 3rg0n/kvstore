@@ -1,11 +1,11 @@
 ---
 title: CLAUDE.md
 description: Development guidance for Claude Code (claude.ai/code) operating in this repository.
-project: kvstoremon
+project: kvstore
 lang: go
 go: "1.26"
-module: github.com/ecopelan/kvstoremon
-entry: cmd/kvstoremon/main.go
+module: github.com/ecopelan/kvstore
+entry: cmd/kvstore/main.go
 store: bbolt
 encryption: AES-256-GCM
 kdf: Argon2id
@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-make build          # Build for current platform → bin/kvstoremon
+make build          # Build for current platform → bin/kvstore
 make build-all      # Cross-compile linux/darwin/windows (amd64+arm64)
 make test           # Run all tests with race detector
 make vet            # go vet static analysis
@@ -42,7 +42,7 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 
 ### Package Layout
 
-- `cmd/kvstoremon/main.go` — CLI entry point. All cobra commands (init, set, get, delete, list, serve, service, version, app) live here. Uses `kardianos/service` for cross-platform OS service integration. Includes `confirmIdentity()` helper (biometric-first, password-fallback).
+- `cmd/kvstore/main.go` — CLI entry point. All cobra commands (init, set, get, delete, list, serve, service, version, app) live here. Uses `kardianos/service` for cross-platform OS service integration. Includes `confirmIdentity()` helper (biometric-first, password-fallback).
 - `internal/crypto` — AES-256-GCM encryption with Argon2id key derivation. Stateless functions.
 - `internal/store` — Core KV store backed by bbolt. Handles encryption at the storage layer: values are JSON-marshaled `Entry` structs encrypted before writing. Namespaces map to bbolt buckets. `_meta` bucket stores salt, verification token, and mode (password/tpm). `_apps` bucket stores encrypted app registration records. Supports both password-derived and TPM-sealed master keys via `KeySealer` interface.
 - `internal/auth` — App registry (`Registry`) and HTTP auth middleware (`Middleware`). Registry manages app records with dual verify modes (SHA-256 hash or code signature). Middleware extracts `Authorization: Bearer <token>`, validates against registry, enforces namespace ACLs, and optionally verifies caller binary via `ProcessVerifier` interface.
@@ -53,12 +53,12 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 
 ### Data Flow
 
-1. **Password init**: `kvstoremon init` → password → Argon2id derives key from password+salt → verification token encrypted → salt+token stored in `_meta`
-2. **TPM init**: `kvstoremon init --tpm` → random 32-byte key generated → sealed with TPM → sealed blob + encrypted verification token stored in `_meta` (mode=tpm)
+1. **Password init**: `kvstore init` → password → Argon2id derives key from password+salt → verification token encrypted → salt+token stored in `_meta`
+2. **TPM init**: `kvstore init --tpm` → random 32-byte key generated → sealed with TPM → sealed blob + encrypted verification token stored in `_meta` (mode=tpm)
 3. **Password unlock**: salt read → key re-derived → verification token decrypted
 4. **TPM unlock**: sealed blob read → TPM unseal → key recovered → verification token decrypted
 5. Set/Get → entry JSON marshaled → encrypted with AES-256-GCM (random nonce per write) → stored in namespace bucket
-6. **App registration**: `kvstoremon app register --binary <path> --namespaces <ns>` → biometric/password confirmation → binary hashed or signature extracted → token generated (kvs_ prefix) → token hash + app record stored in `_apps` bucket
+6. **App registration**: `kvstore app register --binary <path> --namespaces <ns>` → biometric/password confirmation → binary hashed or signature extracted → token generated (kvs_ prefix) → token hash + app record stored in `_apps` bucket
 7. **HTTP auth flow**: request → extract `Bearer <token>` → resolve caller PID via IPC connection → get binary path → `Registry.Verify(token, binaryPath, namespace)` → match token hash → verify binary identity → check namespace ACL → allow or reject (401/403)
 
 ### Key Design Decisions
@@ -66,7 +66,7 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 - **bbolt** over SQLite: pure Go, no CGO, single-file embedded KV — true single binary cross-compilation
 - **stdlib router** (Go 1.22+): eliminates chi/gorilla dependency for HTTP routing
 - **Namespace = bbolt bucket**: natural isolation, efficient key enumeration per namespace
-- **Password via env var** (`KVSTOREMON_KEY`): required for service mode, optional interactive prompt for CLI
+- **Password via env var** (`KVSTORE_KEY`): required for service mode, optional interactive prompt for CLI
 - **`kardianos/service`**: unified service management across Windows SCM, systemd, launchd
 - **AppStore interface**: `auth.Registry` depends on a small interface (`PutAppRecord`, `GetAppRecord`, `DeleteAppRecord`, `ListAppRecords`), not the full `*store.Store` — keeps auth decoupled from storage
 - **KeySealer interface**: Store depends on `TPMSeal`/`TPMUnseal` for hardware key binding, not the full Platform
@@ -79,17 +79,17 @@ Single-binary Go CLI + HTTP server for encrypted key-value storage. No external 
 ### CLI Commands
 
 ```
-kvstoremon init [--tpm]                          # Initialize store (password or TPM-sealed)
-kvstoremon set <namespace> <key> <value>         # Set a key-value pair
-kvstoremon get <namespace> <key> [--json]         # Get a value
-kvstoremon delete <namespace> <key>              # Delete a key
-kvstoremon list [namespace]                      # List namespaces or keys
-kvstoremon serve [--addr <addr>] [--no-auth]     # Start HTTP API server
-kvstoremon service install|uninstall|start|stop|status  # OS service management
-kvstoremon app register --binary <path> --namespaces <ns> [--name <n>] [--verify hash|signature|auto]
-kvstoremon app list                              # List registered apps
-kvstoremon app revoke <app-id>                   # Revoke app access
-kvstoremon app rehash <app-id>                   # Re-hash binary after update
-kvstoremon app update-ns <app-id> --namespaces <ns>  # Change namespace ACLs
-kvstoremon version                               # Print version
+kvstore init [--tpm]                          # Initialize store (password or TPM-sealed)
+kvstore set <namespace> <key> <value>         # Set a key-value pair
+kvstore get <namespace> <key> [--json]         # Get a value
+kvstore delete <namespace> <key>              # Delete a key
+kvstore list [namespace]                      # List namespaces or keys
+kvstore serve [--addr <addr>] [--no-auth]     # Start HTTP API server
+kvstore service install|uninstall|start|stop|status  # OS service management
+kvstore app register --binary <path> --namespaces <ns> [--name <n>] [--verify hash|signature|auto]
+kvstore app list                              # List registered apps
+kvstore app revoke <app-id>                   # Revoke app access
+kvstore app rehash <app-id>                   # Re-hash binary after update
+kvstore app update-ns <app-id> --namespaces <ns>  # Change namespace ACLs
+kvstore version                               # Print version
 ```

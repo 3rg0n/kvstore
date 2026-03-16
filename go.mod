@@ -1,4 +1,4 @@
-module github.com/ecopelan/kvstoremon
+module github.com/ecopelan/kvstore
 
 go 1.26.0
 

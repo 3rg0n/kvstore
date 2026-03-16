@@ -1,5 +1,5 @@
 ---
-title: kvstoremon
+title: kvstore
 description: Lightweight, cross-platform encrypted key-value store for local-first secret and configuration management.
 version: 0.1.0
 lang: go
@@ -10,7 +10,7 @@ architectures: [amd64, arm64]
 tags: [kv-store, encryption, secrets, config-management, tpm, cli, rest-api]
 ---
 
-# kvstoremon
+# kvstore
 
 A lightweight, cross-platform encrypted key-value store. Local-first secret and configuration management with a single binary.
 
@@ -28,8 +28,8 @@ A lightweight, cross-platform encrypted key-value store. Local-first secret and 
 ### Build from source
 
 ```bash
-git clone https://github.com/ecopelan/kvstoremon.git
-cd kvstoremon
+git clone https://github.com/ecopelan/kvstore.git
+cd kvstore
 make build
 ```
 
@@ -45,25 +45,25 @@ Produces binaries for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, wind
 
 ```bash
 # Initialize the store with a master password
-kvstoremon init
+kvstore init
 
 # Store a secret
-kvstoremon set secrets api-key "sk-12345"
+kvstore set secrets api-key "sk-12345"
 
 # Retrieve it
-kvstoremon get secrets api-key
+kvstore get secrets api-key
 
 # Retrieve with full metadata
-kvstoremon get secrets api-key --json
+kvstore get secrets api-key --json
 
 # List namespaces
-kvstoremon list
+kvstore list
 
 # List keys in a namespace
-kvstoremon list secrets
+kvstore list secrets
 
 # Delete a key
-kvstoremon delete secrets api-key
+kvstore delete secrets api-key
 ```
 
 ## HTTP API
@@ -71,8 +71,8 @@ kvstoremon delete secrets api-key
 Start the API server:
 
 ```bash
-kvstoremon serve
-kvstoremon serve --addr 127.0.0.1:8080
+kvstore serve
+kvstore serve --addr 127.0.0.1:8080
 ```
 
 ### Endpoints
@@ -108,39 +108,39 @@ curl -X DELETE http://127.0.0.1:7390/api/v1/kv/secrets/db-password
 
 ```bash
 # Install as a system service
-kvstoremon service install
+kvstore service install
 
 # Manage the service
-kvstoremon service start
-kvstoremon service stop
-kvstoremon service status
+kvstore service start
+kvstore service stop
+kvstore service status
 
 # Uninstall
-kvstoremon service uninstall
+kvstore service uninstall
 ```
 
 When running as a service, provide the master password via environment variable:
 
 ```bash
-export KVSTOREMON_KEY="your-master-password"
-kvstoremon service install
-kvstoremon service start
+export KVSTORE_KEY="your-master-password"
+kvstore service install
+kvstore service start
 ```
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `KVSTOREMON_KEY` | Master password (avoids interactive prompt) |
-| `KVSTOREMON_DATA_DIR` | Custom data directory path |
+| `KVSTORE_KEY` | Master password (avoids interactive prompt) |
+| `KVSTORE_DATA_DIR` | Custom data directory path |
 
 ## Data Storage
 
 | Platform | Default Path |
 |----------|-------------|
-| Linux | `~/.local/share/kvstoremon/store.db` |
-| macOS | `~/Library/Application Support/kvstoremon/store.db` |
-| Windows | `%APPDATA%\kvstoremon\store.db` |
+| Linux | `~/.local/share/kvstore/store.db` |
+| macOS | `~/Library/Application Support/kvstore/store.db` |
+| Windows | `%APPDATA%\kvstore\store.db` |
 
 ## Development
 

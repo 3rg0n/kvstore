@@ -14,8 +14,8 @@ func New() (service.Service, error) {
 	}
 
 	cfg := &service.Config{
-		Name:        "kvstoremon",
-		DisplayName: "kvstoremon",
+		Name:        "kvstore",
+		DisplayName: "kvstore",
 		Description: "Lightweight encrypted key-value store service",
 		Executable:  exe,
 		Arguments:   []string{"serve"},

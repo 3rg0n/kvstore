@@ -15,7 +15,7 @@
 - `internal/auth/registry.go` — Nolint annotation on filepath.Clean.
 - `internal/server/server.go` — Start() now accepts net.Listener. ConnContext set on http.Server when auth middleware is active.
 - `internal/config/config.go` — Added SocketPath() for platform-specific IPC path.
-- `cmd/kvstoremon/main.go` — serveProgram creates platform listener when auth enabled, falls back to TCP. Imports platform package.
+- `cmd/kvstore/main.go` — serveProgram creates platform listener when auth enabled, falls back to TCP. Imports platform package.
 - `go.mod` — golang.org/x/sys promoted to direct dependency.
 
 ## Design Decisions

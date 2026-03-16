@@ -12,7 +12,7 @@
 - `internal/platform/platform_linux.go` — TPM stub methods. HasTPM returns false (planned: /dev/tpmrm0 via go-tpm-tools).
 - `internal/store/store.go` — Added KeySealer interface, InitTPM(), UnlockTPM(), IsTPMMode(). New _meta keys: mode, sealed_key. ModePassword/ModeTPM exported constants.
 - `internal/store/store_test.go` — Added TestInitTPMAndUnlock, TestPasswordModeNotTPM, TestDoubleInitTPM with mockSealer.
-- `cmd/kvstoremon/main.go` — Added --tpm flag to init. Auto-detect TPM hint. openAndUnlock() auto-detects TPM mode and uses UnlockTPM.
+- `cmd/kvstore/main.go` — Added --tpm flag to init. Auto-detect TPM hint. openAndUnlock() auto-detects TPM mode and uses UnlockTPM.
 
 ## Design Decisions
 - **KeySealer interface**: Store depends on a small interface (TPMSeal/TPMUnseal), not the full Platform. Keeps store decoupled from platform.

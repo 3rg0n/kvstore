@@ -8,7 +8,7 @@
 - `internal/platform/platform_darwin.go` — Biometric stub (Touch ID via inline swift planned). Always succeeds for now.
 - `internal/platform/platform_linux.go` — Biometric stub (FIDO2/polkit planned). Always succeeds for now.
 - `internal/platform/platform_test.go` — Added TestHasBiometric and TestBiometricPromptStub.
-- `cmd/kvstoremon/main.go` — Added `confirmIdentity()` helper: tries platform biometric first, falls back to password. All app commands (register, revoke, rehash, update-ns) now use it.
+- `cmd/kvstore/main.go` — Added `confirmIdentity()` helper: tries platform biometric first, falls back to password. All app commands (register, revoke, rehash, update-ns) now use it.
 
 ## Design Decisions
 - **Biometric-first, password-fallback**: `confirmIdentity()` tries `BiometricPrompt()` first. If biometric fails or is unavailable, falls back to master password re-entry. This enables smooth transition when real biometric is wired.
