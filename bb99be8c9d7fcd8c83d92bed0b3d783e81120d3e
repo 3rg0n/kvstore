@@ -1,0 +1,35 @@
+internal/server/server.go
+  7864934018b48233 64-69,199-221
+test/cmd/badclient/main.go
+  7864934018b48233 1-96
+cmd/kvstore/main.go
+  7864934018b48233 49,64-67,76,327,340-344,354-356,358,363-365,412-414
+internal/auth/middleware.go
+  7864934018b48233 53-60,62,72-75,89-94,115,121,125
+Makefile
+  7864934018b48233 5,21-23
+test/cmd/goodclient/main.go
+  7864934018b48233 1-96
+test/e2e.sh
+  7864934018b48233 1-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "bb99be8c9d7fcd8c83d92bed0b3d783e81120d3e",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 551,
+      "total_deletions": 27,
+      "accepted_lines": 539,
+      "overriden_lines": 0
+    }
+  }
+}
