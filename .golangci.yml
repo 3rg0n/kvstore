@@ -10,18 +10,13 @@ linters:
     - misspell
     - bodyclose
     - gosec
-
-linters-settings:
-  gosec:
-    excludes:
-      - G104
-      - G115
+  settings:
+    gosec:
+      excludes:
+        - G104
+        - G115
 
 formatters:
   enable:
     - gofmt
     - goimports
-
-issues:
-  exclude-dirs:
-    - bin
