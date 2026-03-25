@@ -55,10 +55,10 @@ func (l *Linux) PeerPID(conn net.Conn) (int, error) {
 		cred, credErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED) //nolint:gosec // fd fits in int
 	})
 	if err != nil {
-		return 0, fmt.Errorf("Control: %w", err)
+		return 0, fmt.Errorf("control: %w", err)
 	}
 	if credErr != nil {
-		return 0, fmt.Errorf("GetsockoptUcred: %w", credErr)
+		return 0, fmt.Errorf("getsockoptUcred: %w", credErr)
 	}
 	return int(cred.Pid), nil
 }
