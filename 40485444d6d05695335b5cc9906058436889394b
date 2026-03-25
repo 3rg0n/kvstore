@@ -1,0 +1,31 @@
+internal/crypto/crypto.go
+  7864934018b48233 18
+internal/store/store.go
+  7864934018b48233 4-5,9,117,151-153,212,457,459-462
+internal/server/server.go
+  7864934018b48233 7,11,18-20,113-116,141-145,169-172,189-192,245-254
+cmd/kvstore/main.go
+  7864934018b48233 197-205
+internal/auth/registry.go
+  7864934018b48233 6,218,235,243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "40485444d6d05695335b5cc9906058436889394b",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 9,
+      "accepted_lines": 60,
+      "overriden_lines": 0
+    }
+  }
+}
