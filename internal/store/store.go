@@ -1,9 +1,12 @@
 package store
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/ecopelan/kvstore/internal/crypto"
@@ -111,7 +114,7 @@ func (s *Store) Unlock(password []byte) error {
 			return ErrInvalidKey
 		}
 
-		if string(plaintext) != string(verifyToken) {
+		if subtle.ConstantTimeCompare(plaintext, verifyToken) != 1 {
 			return ErrInvalidKey
 		}
 
@@ -145,8 +148,9 @@ func (s *Store) InitTPM(sealer KeySealer) error {
 		if err != nil {
 			return err
 		}
-		// Use salt as the random key material for consistency with store format
-		copy(key, salt)
+		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+			return fmt.Errorf("generating master key: %w", err)
+		}
 
 		// Seal the key with TPM
 		sealed, err := sealer.TPMSeal(key)
@@ -205,7 +209,7 @@ func (s *Store) UnlockTPM(sealer KeySealer) error {
 			return ErrInvalidKey
 		}
 
-		if string(plaintext) != string(verifyToken) {
+		if subtle.ConstantTimeCompare(plaintext, verifyToken) != 1 {
 			return ErrInvalidKey
 		}
 
@@ -450,7 +454,11 @@ func (s *Store) ListAppRecords() (map[string][]byte, error) {
 	return records, err
 }
 
-// Close closes the store.
+// Close closes the store and zeros the master key.
 func (s *Store) Close() error {
+	for i := range s.key {
+		s.key[i] = 0
+	}
+	s.key = nil
 	return s.db.Close()
 }

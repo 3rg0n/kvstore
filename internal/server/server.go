@@ -4,14 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/ecopelan/kvstore/internal/auth"
 	"github.com/ecopelan/kvstore/internal/store"
 )
+
+const maxBodySize = 1 << 20 // 1 MiB
+
+var validPathParam = regexp.MustCompile(`^[a-zA-Z0-9_\-\.]+$`)
 
 // Server is the HTTP API server for kvstore.
 type Server struct {
@@ -104,6 +110,10 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
 	key := r.PathValue("key")
 
+	if !validateParam(w, "namespace", namespace) || !validateParam(w, "key", key) {
+		return
+	}
+
 	entry, err := s.store.Get(namespace, key)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -128,6 +138,11 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
 	key := r.PathValue("key")
 
+	if !validateParam(w, "namespace", namespace) || !validateParam(w, "key", key) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	var req setRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid request body"})
@@ -151,6 +166,10 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
 	key := r.PathValue("key")
 
+	if !validateParam(w, "namespace", namespace) || !validateParam(w, "key", key) {
+		return
+	}
+
 	if err := s.store.Delete(namespace, key); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, errorResponse{Error: "key not found"})
@@ -166,6 +185,10 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
+
+	if !validateParam(w, "namespace", namespace) {
+		return
+	}
 
 	keys, err := s.store.List(namespace)
 	if err != nil {
@@ -217,6 +240,16 @@ func (s *Server) withLog(next http.HandlerFunc) http.HandlerFunc {
 			"status", sw.status,
 			"duration_ms", time.Since(start).Milliseconds())
 	}
+}
+
+func validateParam(w http.ResponseWriter, name, value string) bool {
+	if value == "" || len(value) > 256 || !validPathParam.MatchString(value) {
+		writeJSON(w, http.StatusBadRequest, errorResponse{
+			Error: fmt.Sprintf("invalid %s: must be 1-256 alphanumeric/dash/underscore/dot characters", name),
+		})
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

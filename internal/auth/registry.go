@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -214,7 +215,7 @@ func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, erro
 		if err := json.Unmarshal(data, &rec); err != nil {
 			continue
 		}
-		if rec.TokenHash == tHash {
+		if subtle.ConstantTimeCompare([]byte(rec.TokenHash), []byte(tHash)) == 1 {
 			matched = &rec
 			break
 		}
@@ -231,7 +232,7 @@ func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, erro
 			if err != nil {
 				return nil, fmt.Errorf("hashing caller binary: %w", err)
 			}
-			if hash != matched.BinaryHash {
+			if subtle.ConstantTimeCompare([]byte(hash), []byte(matched.BinaryHash)) != 1 {
 				return nil, ErrBinaryMismatch
 			}
 		case VerifySignature:
@@ -239,7 +240,7 @@ func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, erro
 			if err != nil {
 				return nil, fmt.Errorf("checking caller signature: %w", err)
 			}
-			if !signed || signerID != matched.SignerID {
+			if !signed || subtle.ConstantTimeCompare([]byte(signerID), []byte(matched.SignerID)) != 1 {
 				return nil, ErrBinaryMismatch
 			}
 		}

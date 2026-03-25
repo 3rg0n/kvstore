@@ -194,6 +194,15 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
+		defer func() {
+			for i := range pw1 {
+				pw1[i] = 0
+			}
+			for i := range pw2 {
+				pw2[i] = 0
+			}
+		}()
+
 		if string(pw1) != string(pw2) {
 			return errors.New("passwords do not match")
 		}

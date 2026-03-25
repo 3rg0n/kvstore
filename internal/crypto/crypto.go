@@ -15,7 +15,7 @@ const (
 	SaltSize     = 32
 	KeySize      = 32
 	NonceSize    = 12
-	ArgonTime    = 1
+	ArgonTime    = 3
 	ArgonMemory  = 64 * 1024
 	ArgonThreads = 4
 )
