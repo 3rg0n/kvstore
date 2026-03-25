@@ -1,14 +1,15 @@
+//go:build darwin
+
 package platform
 
 // tpmSealStub and tpmUnsealStub provide a reversible transformation as a
-// structural placeholder for real TPM sealing. They are NOT cryptographically
-// secure — they exist only to validate the Init/Unlock TPM code paths until
-// google/go-tpm-tools is integrated.
+// structural placeholder for real Secure Enclave sealing on macOS.
+// They are NOT cryptographically secure — they exist only to validate the
+// Init/Unlock TPM code paths until CGO Secure Enclave integration lands.
 //
 // The stub uses a fixed XOR key so that seal/unseal round-trips correctly.
-// Real TPM sealing binds data to the hardware's storage root key (SRK).
 
-var tpmStubKey = []byte("kvstore-tpm-stub-placeholder!") // 32 bytes
+var tpmStubKey = []byte("kvstore-tpm-stub-placeholder!") // 29 bytes
 
 func tpmSealStub(data []byte) []byte {
 	out := make([]byte, len(data))

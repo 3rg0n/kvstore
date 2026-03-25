@@ -3,6 +3,7 @@ module github.com/ecopelan/kvstore
 go 1.26.0
 
 require (
+	github.com/google/go-tpm v0.9.8
 	github.com/google/uuid v1.6.0
 	github.com/kardianos/service v1.2.4
 	github.com/spf13/cobra v1.10.2

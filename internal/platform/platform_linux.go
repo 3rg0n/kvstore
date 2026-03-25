@@ -91,23 +91,19 @@ func (l *Linux) HasBiometric() bool {
 	return true
 }
 
-// TPMSeal seals data using TPM 2.0 via /dev/tpmrm0.
-//
-// A full implementation would use google/go-tpm-tools to seal a key to
-// the TPM's storage root key (SRK). For now this is a stub that uses
-// a simple XOR obfuscation as a placeholder — not secure, only structural.
+// TPMSeal seals data to this machine's TPM 2.0 via /dev/tpmrm0.
+// The data is bound to the TPM's Storage Root Key and cannot be
+// unsealed on a different machine.
 func (l *Linux) TPMSeal(data []byte) ([]byte, error) {
-	// TODO: Integrate google/go-tpm-tools for real TPM sealing via /dev/tpmrm0
-	return tpmSealStub(data), nil
+	return tpmSeal(data)
 }
 
-// TPMUnseal reverses a TPMSeal operation.
+// TPMUnseal recovers data sealed by TPMSeal.
 func (l *Linux) TPMUnseal(sealed []byte) ([]byte, error) {
-	return tpmUnsealStub(sealed), nil
+	return tpmUnseal(sealed)
 }
 
-// HasTPM reports whether TPM 2.0 is available.
+// HasTPM reports whether TPM 2.0 is available via /dev/tpmrm0.
 func (l *Linux) HasTPM() bool {
-	// TODO: Check for /dev/tpmrm0
-	return false
+	return tpmAvailable()
 }
