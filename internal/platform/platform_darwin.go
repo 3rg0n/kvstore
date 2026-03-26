@@ -103,42 +103,31 @@ func (d *Darwin) ProcessPath(pid int) (string, error) {
 	return string(buf), nil
 }
 
-// BiometricPrompt requests Touch ID verification via inline swift execution.
-//
-// Uses LAContext from LocalAuthentication framework via a swift one-liner.
-// swift is always available on macOS, so no CGO or external binary is needed.
+// BiometricPrompt requests Touch ID verification via LocalAuthentication.framework.
+// Blocks until the user verifies with Touch ID or cancels.
 func (d *Darwin) BiometricPrompt(reason string) error {
-	// TODO: Implement Touch ID via:
-	// swift -e 'import LocalAuthentication; let c = LAContext(); ...'
-	// For now, stub that always succeeds.
-	_ = reason
-	return nil
+	return touchIDPrompt(reason)
 }
 
-// HasBiometric reports whether Touch ID is available.
+// HasBiometric reports whether Touch ID hardware is present and enrolled.
 func (d *Darwin) HasBiometric() bool {
-	// A full check would run:
-	// swift -e 'import LocalAuthentication; print(LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil))'
-	return true
+	return touchIDAvailable()
 }
 
 // TPMSeal seals data using the macOS Secure Enclave.
-//
-// macOS has no TPM. A full implementation would use the Secure Enclave
-// via a swift helper for hardware-bound key storage, or Keychain with
-// biometric ACL. For now this is a stub placeholder.
+// A P-256 key is created in the Secure Enclave on first use and stored
+// in the Keychain. Data is encrypted with ECIES; the private key never
+// leaves the hardware.
 func (d *Darwin) TPMSeal(data []byte) ([]byte, error) {
-	// TODO: Implement Secure Enclave key storage via swift helper
-	return tpmSealStub(data), nil
+	return enclaveSeal(data)
 }
 
-// TPMUnseal reverses a TPMSeal operation.
+// TPMUnseal reverses a TPMSeal operation using the Secure Enclave.
 func (d *Darwin) TPMUnseal(sealed []byte) ([]byte, error) {
-	return tpmUnsealStub(sealed), nil
+	return enclaveUnseal(sealed)
 }
 
-// HasTPM reports whether hardware key storage (Secure Enclave) is available.
+// HasTPM reports whether the Secure Enclave is available (T2 or Apple Silicon).
 func (d *Darwin) HasTPM() bool {
-	// TODO: Check for Secure Enclave availability
-	return false
+	return enclaveAvailable()
 }

@@ -10,7 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -290,10 +293,53 @@ func HashBinary(path string) (string, error) {
 }
 
 // CheckSignature checks if a binary is code-signed and returns the signer identity.
-// This is a placeholder that always returns unsigned. Platform-specific implementations
-// will be added in a later step.
-func CheckSignature(_ string) (signerID string, signed bool, err error) {
+// On macOS, uses the codesign tool. On Windows, uses Get-AuthenticodeSignature.
+// On Linux, returns unsigned (no standard code signing mechanism).
+func CheckSignature(path string) (signerID string, signed bool, err error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return checkSignatureDarwin(path)
+	case "windows":
+		return checkSignatureWindows(path)
+	default:
+		return "", false, nil
+	}
+}
+
+// checkSignatureDarwin verifies an Apple code signature using the codesign tool
+// and extracts the signing authority (e.g., "Developer ID Application: ...").
+func checkSignatureDarwin(path string) (string, bool, error) {
+	cmd := exec.Command("codesign", "-d", "-vvv", path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", false, nil // unsigned or invalid
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Authority=") {
+			return strings.TrimPrefix(line, "Authority="), true, nil
+		}
+	}
 	return "", false, nil
+}
+
+// checkSignatureWindows verifies an Authenticode signature and extracts the signer subject.
+func checkSignatureWindows(path string) (string, bool, error) {
+	script := `$sig = Get-AuthenticodeSignature -LiteralPath $env:KVSTORE_SIG_PATH
+if ($sig.Status -eq 'Valid' -or $sig.Status -eq 'UnknownError') {
+    Write-Output $sig.SignerCertificate.Subject
+} else { exit 1 }`
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	cmd.Env = append(os.Environ(), "KVSTORE_SIG_PATH="+path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", false, nil // unsigned
+	}
+	subject := strings.TrimSpace(string(output))
+	if subject == "" {
+		return "", false, nil
+	}
+	return subject, true, nil
 }
 
 func generateToken() (string, error) {

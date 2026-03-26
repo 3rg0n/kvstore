@@ -21,10 +21,13 @@ func New() (service.Service, error) {
 		Arguments:   []string{"serve"},
 	}
 
-	return service.New(&stub{}, cfg)
+	return service.New(&noopProgram{}, cfg)
 }
 
-type stub struct{}
+// noopProgram satisfies the service.Interface required by kardianos/service.New
+// for management operations (install, uninstall, status). The real Start/Stop
+// logic lives in serveProgram in cmd/kvstore/main.go.
+type noopProgram struct{}
 
-func (s *stub) Start(_ service.Service) error { return nil }
-func (s *stub) Stop(_ service.Service) error  { return nil }
+func (n *noopProgram) Start(_ service.Service) error { return nil }
+func (n *noopProgram) Stop(_ service.Service) error  { return nil }

@@ -73,7 +73,7 @@ func TestRegisterAutoMode(t *testing.T) {
 	reg, _ := setupTestRegistry(t)
 	binary := testBinaryPath(t)
 
-	// Auto should resolve to hash since CheckSignature stub returns unsigned
+	// Auto resolves to hash when the test binary is unsigned
 	token, err := reg.Register("", binary, []string{"ns1"}, VerifyAuto)
 	if err != nil {
 		t.Fatalf("register auto: %v", err)
@@ -269,7 +269,7 @@ func TestRehashSignatureModeError(t *testing.T) {
 	reg, _ := setupTestRegistry(t)
 	binary := testBinaryPath(t)
 
-	// Register in hash mode first (signature mode won't work with stub)
+	// Register in hash mode first (signature mode requires a signed binary)
 	_, err := reg.Register("test-app", binary, []string{"ns1"}, VerifyHash)
 	if err != nil {
 		t.Fatalf("register: %v", err)

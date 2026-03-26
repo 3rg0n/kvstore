@@ -5,8 +5,13 @@ package platform
 import (
 	"fmt"
 	"net"
+	"os"
+	"os/exec"
+	"strings"
+	"syscall"
 	"unsafe"
 
+	winio "github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 )
 
@@ -20,13 +25,18 @@ func New() Platform {
 
 // Listener returns a named pipe listener. The path should be a pipe name
 // like "kvstore" which becomes \\.\pipe\kvstore.
-//
-// Go's net package doesn't natively support named pipes. A production
-// implementation would use microsoft/go-winio. For now we use a localhost
-// TCP listener as a functional stub. PeerPID will attempt
-// GetNamedPipeClientProcessId and gracefully fail for TCP connections.
-func (w *Windows) Listener(_ string) (net.Listener, error) {
-	return net.Listen("tcp", "127.0.0.1:0")
+// The pipe is restricted to the creating user and SYSTEM.
+func (w *Windows) Listener(path string) (net.Listener, error) {
+	pipePath := `\\.\pipe\` + path
+	cfg := &winio.PipeConfig{
+		// Owner (OW) and SYSTEM (SY) get full access; deny everyone else.
+		SecurityDescriptor: "D:P(A;;GA;;;OW)(A;;GA;;;SY)",
+	}
+	ln, err := winio.ListenPipe(pipePath, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("listening on named pipe %s: %w", pipePath, err)
+	}
+	return ln, nil
 }
 
 var (
@@ -36,13 +46,8 @@ var (
 )
 
 // PeerPID returns the process ID of the named pipe client.
-// For TCP connections (stub), this returns an error.
 func (w *Windows) PeerPID(conn net.Conn) (int, error) {
-	sc, ok := conn.(interface {
-		SyscallConn() (interface {
-			Control(func(fd uintptr)) error
-		}, error)
-	})
+	sc, ok := conn.(syscall.Conn)
 	if !ok {
 		return 0, fmt.Errorf("connection does not support SyscallConn")
 	}
@@ -96,27 +101,57 @@ func (w *Windows) ProcessPath(pid int) (string, error) {
 	return windows.UTF16ToString(buf[:size]), nil
 }
 
-// BiometricPrompt requests Windows Hello verification.
-//
-// A full implementation would use webauthn.dll (via go-ctap/winhello) to
-// trigger the Windows Hello dialog. For now this is a stub that always
-// succeeds — real biometric gating will be wired when the winhello
-// dependency is integrated.
-func (w *Windows) BiometricPrompt(_ string) error {
-	// TODO: Integrate go-ctap/winhello for Windows Hello prompt
+// winRTPreamble is the PowerShell boilerplate for awaiting WinRT async calls.
+// UserConsentVerifier lives in the Windows.Security.Credentials.UI namespace
+// and provides the simplest path to trigger Windows Hello (fingerprint, face, PIN).
+const winRTPreamble = `
+[void][Windows.Security.Credentials.UI.UserConsentVerifier,Windows.Security.Credentials.UI,ContentType=WindowsRuntime]
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
+    $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation` + "`" + `1'
+})[0]
+function Invoke-Async($op, $resultType) {
+    $task = $asTaskGeneric.MakeGenericMethod($resultType).Invoke($null, @($op))
+    $task.Wait() | Out-Null
+    return $task.Result
+}
+`
+
+// BiometricPrompt requests Windows Hello verification via UserConsentVerifier.
+// Triggers the system Windows Hello dialog (fingerprint, face recognition, or PIN).
+func (w *Windows) BiometricPrompt(reason string) error {
+	script := winRTPreamble + `
+$result = Invoke-Async ([Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync($env:KVSTORE_BIO_REASON)) ([Windows.Security.Credentials.UI.UserConsentVerificationResult])
+if ($result -ne [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) {
+    Write-Error "Windows Hello verification failed: $result"
+    exit 1
+}
+`
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	cmd.Env = append(os.Environ(), "KVSTORE_BIO_REASON="+reason)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(output))
+		if msg != "" {
+			return fmt.Errorf("windows hello: %s", msg)
+		}
+		return fmt.Errorf("windows hello verification failed")
+	}
 	return nil
 }
 
-// HasBiometric reports whether Windows Hello is available.
+// HasBiometric reports whether Windows Hello is configured and available.
 func (w *Windows) HasBiometric() bool {
-	// Windows Hello availability check via webauthn.dll
-	// Stub: assume available on Windows 10+
-	return true
+	script := winRTPreamble + `
+$result = Invoke-Async ([Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync()) ([Windows.Security.Credentials.UI.UserConsentVerifierAvailability])
+if ($result -ne [Windows.Security.Credentials.UI.UserConsentVerifierAvailability]::Available) { exit 1 }
+`
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	return cmd.Run() == nil
 }
 
 // TPMSeal seals data to this machine's TPM 2.0 via Windows TBS.
-// The data is bound to the TPM's Storage Root Key and cannot be
-// unsealed on a different machine.
 func (w *Windows) TPMSeal(data []byte) ([]byte, error) {
 	return tpmSeal(data)
 }

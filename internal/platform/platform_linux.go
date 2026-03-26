@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 
 	"golang.org/x/sys/unix"
 )
@@ -73,22 +74,23 @@ func (l *Linux) ProcessPath(pid int) (string, error) {
 	return path, nil
 }
 
-// BiometricPrompt requests user verification via polkit or FIDO2.
-//
-// A full implementation would use go-libfido2 for YubiKey or a polkit
-// agent for desktop environments. For now this is a stub that always
-// succeeds — real biometric gating will be wired when the FIDO2
-// dependency is integrated.
+// BiometricPrompt requests user verification via fprintd (fingerprint daemon).
+// Uses the fprintd-verify D-Bus service which is standard on most Linux desktops
+// with fingerprint hardware. Returns an error if verification fails or fprintd
+// is not available.
 func (l *Linux) BiometricPrompt(_ string) error {
-	// TODO: Integrate go-libfido2 or polkit prompt
+	cmd := exec.Command("fprintd-verify")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("fingerprint verification failed: %s", string(output))
+	}
 	return nil
 }
 
-// HasBiometric reports whether a biometric mechanism is available.
+// HasBiometric reports whether fprintd fingerprint verification is available.
 func (l *Linux) HasBiometric() bool {
-	// Check for FIDO2 device or polkit agent
-	// Stub: assume available
-	return true
+	_, err := exec.LookPath("fprintd-verify")
+	return err == nil
 }
 
 // TPMSeal seals data to this machine's TPM 2.0 via /dev/tpmrm0.
