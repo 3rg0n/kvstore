@@ -1,0 +1,41 @@
+internal/tui/server.go
+  7864934018b48233 1-157
+internal/tui/menu.go
+  7864934018b48233 1-113
+internal/tui/settings.go
+  7864934018b48233 1-55
+cmd/kvstore/main.go
+  7864934018b48233 22,41-43
+internal/tui/secrets.go
+  7864934018b48233 1-477
+internal/auth/registry.go
+  7864934018b48233 312
+internal/tui/tui.go
+  7864934018b48233 1-154
+internal/tui/apps.go
+  7864934018b48233 1-401
+internal/tui/unlock.go
+  7864934018b48233 1-327
+internal/tui/styles.go
+  7864934018b48233 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "aadee55afdd8aa21fdb45dd791d5718b98b80964",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1783,
+      "total_deletions": 39,
+      "accepted_lines": 1744,
+      "overriden_lines": 0
+    }
+  }
+}
