@@ -19,6 +19,7 @@ import (
 	"github.com/ecopelan/kvstore/internal/server"
 	svc "github.com/ecopelan/kvstore/internal/service"
 	"github.com/ecopelan/kvstore/internal/store"
+	"github.com/ecopelan/kvstore/internal/tui"
 	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -37,6 +38,9 @@ var rootCmd = &cobra.Command{
 	Short:        "Lightweight encrypted key-value store",
 	Long:         "A cross-platform, TPM-ready encrypted key-value store for secrets and configuration management.",
 	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return tui.Start(version)
+	},
 }
 
 func init() {

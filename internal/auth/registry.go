@@ -309,7 +309,7 @@ func CheckSignature(path string) (signerID string, signed bool, err error) {
 // checkSignatureDarwin verifies an Apple code signature using the codesign tool
 // and extracts the signing authority (e.g., "Developer ID Application: ...").
 func checkSignatureDarwin(path string) (string, bool, error) {
-	cmd := exec.Command("codesign", "-d", "-vvv", path)
+	cmd := exec.Command("codesign", "-d", "-vvv", path) //nolint:gosec // path is caller-supplied binary path for signature verification
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", false, nil // unsigned or invalid
