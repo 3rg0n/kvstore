@@ -1,0 +1,49 @@
+internal/platform/enclave_darwin.go
+  7864934018b48233 1-49
+internal/platform/platform_windows.go
+  7864934018b48233 8-11,14,28-39,50,104-140,144,146-151
+internal/platform/platform_test.go
+  7864934018b48233 42-44,47,50-53,55,60,64-65,72-73,78
+internal/service/service.go
+  7864934018b48233 24,27-30,32-33
+internal/platform/platform_darwin.go
+  7864934018b48233 106-107,109,112,114,118-120,122,125,127,130,132
+internal/platform/biometric_cgo_darwin.go
+  7864934018b48233 1-34
+internal/platform/tpm_stub.go
+  7864934018b48233 1,5-8,10-15,18-23,26-27
+internal/platform/biometric_darwin.h
+  7864934018b48233 1-21
+internal/platform/enclave_darwin.h
+  7864934018b48233 1-27
+internal/platform/enclave_darwin.c
+  7864934018b48233 1-233
+internal/platform/platform_linux.go
+  7864934018b48233 9,77-80,82-86,90,92-93
+internal/auth/registry_test.go
+  7864934018b48233 76,272
+internal/platform/biometric_darwin.m
+  7864934018b48233 1-69
+internal/auth/registry.go
+  7864934018b48233 13,15-16,296-322,326-342
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "63496da32622af62ab7eec4023140635e83c53c6",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 618,
+      "total_deletions": 103,
+      "accepted_lines": 615,
+      "overriden_lines": 0
+    }
+  }
+}
