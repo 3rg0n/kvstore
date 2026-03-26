@@ -1,0 +1,27 @@
+CONTRIBUTING.md
+  7864934018b48233 1-113
+README.md
+  7864934018b48233 3,7-19,24,26,30-31,34-41,43-44,49,73,76,80-82,97-98,102,105,142,144-150,152-159,175,178,180,184,187,195-209,216-217,222,226
+LICENSE.md
+  7864934018b48233 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "e9c37fb399f31338de517cd0496f12d553ee5095",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 215,
+      "total_deletions": 74,
+      "accepted_lines": 215,
+      "overriden_lines": 0
+    }
+  }
+}
