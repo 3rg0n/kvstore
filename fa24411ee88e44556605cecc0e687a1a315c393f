@@ -1,0 +1,41 @@
+internal/auth/hash_default.go
+  7864934018b48233 1-47
+internal/auth/hash_linux.go
+  7864934018b48233 1-54
+internal/platform/platform_windows.go
+  7864934018b48233 28-31,36,94-97,112-163
+internal/auth/middleware.go
+  7864934018b48233 5,19-22,24,43-44,46-48,75,77,108-112,114,119,122,124-125,129
+internal/platform/platform_darwin.go
+  7864934018b48233 84-87,110-125
+internal/auth/hash_windows.go
+  7864934018b48233 1-64
+internal/platform/platform.go
+  7864934018b48233 20-25
+internal/platform/platform_linux.go
+  7864934018b48233 77-95
+internal/tui/apps.go
+  7864934018b48233 220,222
+internal/auth/registry.go
+  7864934018b48233 61-67,71,79-82,156-163,172-177,233-234,236,264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.21",
+  "base_commit_sha": "fa24411ee88e44556605cecc0e687a1a315c393f",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1903,
+      "total_deletions": 51,
+      "accepted_lines": 1881,
+      "overriden_lines": 0
+    }
+  }
+}
