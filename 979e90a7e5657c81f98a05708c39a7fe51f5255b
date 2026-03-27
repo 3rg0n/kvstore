@@ -1,0 +1,29 @@
+internal/config/config.go
+  7864934018b48233 59-88
+internal/store/store.go
+  7864934018b48233 24,366,458-500
+internal/pki/pki.go
+  7864934018b48233 1-472
+cmd/kvstore/main.go
+  7864934018b48233 6,14,20,61,367-378,380,400-403,405,602,628-634,639-646
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.21",
+  "base_commit_sha": "979e90a7e5657c81f98a05708c39a7fe51f5255b",
+  "prompts": {
+    "7864934018b48233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ecbb6a0-0e1c-404d-a50a-f88ed938bef1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Ergon Copeland <62959009+3rg0n@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1548,
+      "overriden_lines": 0
+    }
+  }
+}
