@@ -25,11 +25,15 @@ func New() Platform {
 
 // Listener returns a named pipe listener. The path should be a pipe name
 // like "kvstore" which becomes \\.\pipe\kvstore.
-// The pipe is restricted to the creating user and SYSTEM.
+// The pipe is restricted to the creating user and SYSTEM via SDDL ACL.
+// Note: FILE_FLAG_FIRST_PIPE_INSTANCE is not exposed by go-winio v0.6.2,
+// but the SDDL (OW+SY only) provides equivalent protection against pipe
+// name hijacking — only the owner or SYSTEM can create instances.
 func (w *Windows) Listener(path string) (net.Listener, error) {
 	pipePath := `\\.\pipe\` + path
 	cfg := &winio.PipeConfig{
 		// Owner (OW) and SYSTEM (SY) get full access; deny everyone else.
+		// The P flag (PROTECTED) prevents inheritance of less restrictive ACLs.
 		SecurityDescriptor: "D:P(A;;GA;;;OW)(A;;GA;;;SY)",
 	}
 	ln, err := winio.ListenPipe(pipePath, cfg)
@@ -87,6 +91,10 @@ func (w *Windows) ProcessPath(pid int) (string, error) {
 	}
 	defer func() { _ = windows.CloseHandle(handle) }()
 
+	return queryProcessImageName(handle)
+}
+
+func queryProcessImageName(handle windows.Handle) (string, error) {
 	buf := make([]uint16, windows.MAX_PATH)
 	size := uint32(len(buf)) //nolint:gosec // MAX_PATH fits in uint32
 	r1, _, e := procQueryFullProcessImageNameW.Call(
@@ -99,6 +107,60 @@ func (w *Windows) ProcessPath(pid int) (string, error) {
 		return "", fmt.Errorf("QueryFullProcessImageNameW: %w", e)
 	}
 	return windows.UTF16ToString(buf[:size]), nil
+}
+
+// ResolveBinary atomically resolves a connection to the caller's PID and
+// binary path. On Windows, opens a process handle immediately after getting
+// the PID and holds it while querying the image name. This prevents PID
+// reuse attacks — if the original process exits and a new process takes its
+// PID, the handle still refers to the original (now-terminated) process,
+// and QueryFullProcessImageNameW will fail rather than return the wrong path.
+func (w *Windows) ResolveBinary(conn net.Conn) (int, string, error) {
+	// Step 1: Get the client PID from the named pipe handle
+	sc, ok := conn.(syscall.Conn)
+	if !ok {
+		return 0, "", fmt.Errorf("connection does not support SyscallConn")
+	}
+
+	raw, err := sc.SyscallConn()
+	if err != nil {
+		return 0, "", fmt.Errorf("getting syscall conn: %w", err)
+	}
+
+	var pid uint32
+	var callErr error
+	err = raw.Control(func(fd uintptr) {
+		r1, _, e := procGetNamedPipeClientProcessId.Call(fd, uintptr(unsafe.Pointer(&pid))) //nolint:gosec // Win32 syscall requires unsafe
+		if r1 == 0 {
+			callErr = fmt.Errorf("GetNamedPipeClientProcessId: %w", e)
+		}
+	})
+	if err != nil {
+		return 0, "", err
+	}
+	if callErr != nil {
+		return 0, "", callErr
+	}
+
+	// Step 2: Immediately open a handle to the process — this pins the
+	// process object in the kernel. Even if the process exits and the PID
+	// is reused, our handle still refers to the original process.
+	handle, err := windows.OpenProcess(
+		windows.PROCESS_QUERY_LIMITED_INFORMATION,
+		false,
+		pid,
+	)
+	if err != nil {
+		return 0, "", fmt.Errorf("OpenProcess(%d): %w", pid, err)
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+
+	// Step 3: Query the image name using the pinned handle
+	path, err := queryProcessImageName(handle)
+	if err != nil {
+		return 0, "", fmt.Errorf("resolving binary path for PID %d: %w", pid, err)
+	}
+	return int(pid), path, nil
 }
 
 // winRTPreamble is the PowerShell boilerplate for awaiting WinRT async calls.

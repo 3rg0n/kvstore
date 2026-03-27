@@ -17,6 +17,12 @@ type Platform interface {
 	// ProcessPath returns the full executable path for the given PID.
 	ProcessPath(pid int) (string, error)
 
+	// ResolveBinary atomically resolves a connection to a caller's PID and
+	// binary path. Unlike calling PeerPID+ProcessPath separately, this holds
+	// the process handle (on Windows) or reads /proc/PID/exe (on Linux) to
+	// prevent PID reuse and path swap attacks between the two steps.
+	ResolveBinary(conn net.Conn) (pid int, path string, err error)
+
 	// BiometricPrompt requests human verification via platform biometric
 	// (Windows Hello, Touch ID, FIDO2/polkit). The reason string is shown
 	// in the system prompt. Returns nil on success, error on denial/timeout.

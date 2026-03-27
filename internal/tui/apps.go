@@ -217,8 +217,9 @@ func (s *appRegisterScreen) buildForm() {
 				Value(&s.namespaces),
 			huh.NewSelect[string]().
 				Title("Verify Mode").
+				Description("Auto prefers code signature on Windows/macOS (recommended)").
 				Options(
-					huh.NewOption("Auto-detect", "auto"),
+					huh.NewOption("Auto-detect (recommended)", "auto"),
 					huh.NewOption("SHA-256 Hash", "hash"),
 					huh.NewOption("Code Signature", "signature"),
 				).

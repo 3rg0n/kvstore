@@ -81,6 +81,10 @@ func (d *Darwin) PeerPID(conn net.Conn) (int, error) {
 // ProcessPath returns the executable path for the given PID using the
 // proc_info syscall (PROC_PIDPATHINFO).
 func (d *Darwin) ProcessPath(pid int) (string, error) {
+	return processPathDarwin(pid)
+}
+
+func processPathDarwin(pid int) (string, error) {
 	const procPidPathInfo = 11 // PROC_PIDPATHINFO
 	buf := make([]byte, 4096)  // PROC_PIDPATHINFO_MAXSIZE
 	_, _, errno := unix.Syscall6(
@@ -101,6 +105,24 @@ func (d *Darwin) ProcessPath(pid int) (string, error) {
 		}
 	}
 	return string(buf), nil
+}
+
+// ResolveBinary atomically resolves a connection to the caller's PID and
+// binary path. On macOS, uses LOCAL_PEERPID + proc_info PROC_PIDPATHINFO
+// back-to-back. While macOS doesn't offer a kernel-level inode guarantee
+// like Linux's /proc/PID/exe, the proc_info syscall queries the kernel's
+// process table directly — more robust than a filesystem path lookup.
+func (d *Darwin) ResolveBinary(conn net.Conn) (int, string, error) {
+	pid, err := d.PeerPID(conn)
+	if err != nil {
+		return 0, "", fmt.Errorf("resolving peer PID: %w", err)
+	}
+
+	path, err := processPathDarwin(pid)
+	if err != nil {
+		return 0, "", fmt.Errorf("resolving binary path for PID %d: %w", pid, err)
+	}
+	return pid, path, nil
 }
 
 // BiometricPrompt requests Touch ID verification via LocalAuthentication.framework.

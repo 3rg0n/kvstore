@@ -112,7 +112,7 @@ func TestVerifySuccess(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	rec, err := reg.Verify(token, binary, "secrets")
+	rec, err := reg.Verify(token, binary, 0, "secrets")
 	if err != nil {
 		t.Fatalf("verify: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestVerifyInvalidToken(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	_, err = reg.Verify("kvs_bogustoken", binary, "secrets")
+	_, err = reg.Verify("kvs_bogustoken", binary, 0, "secrets")
 	if err != ErrInvalidToken {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
@@ -151,7 +151,7 @@ func TestVerifyBinaryMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = reg.Verify(token, tmp, "secrets")
+	_, err = reg.Verify(token, tmp, 0, "secrets")
 	if err != ErrBinaryMismatch {
 		t.Fatalf("expected ErrBinaryMismatch, got %v", err)
 	}
@@ -166,7 +166,7 @@ func TestVerifyNamespaceDenied(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	_, err = reg.Verify(token, binary, "other-namespace")
+	_, err = reg.Verify(token, binary, 0, "other-namespace")
 	if err != ErrNamespaceDenied {
 		t.Fatalf("expected ErrNamespaceDenied, got %v", err)
 	}
@@ -181,7 +181,7 @@ func TestVerifyWildcardNamespace(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	rec, err := reg.Verify(token, binary, "any-namespace")
+	rec, err := reg.Verify(token, binary, 0, "any-namespace")
 	if err != nil {
 		t.Fatalf("verify wildcard: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestRevoke(t *testing.T) {
 	}
 
 	// Verify with old token should fail
-	_, err = reg.Verify(token, binary, "secrets")
+	_, err = reg.Verify(token, binary, 0, "secrets")
 	if err != ErrInvalidToken {
 		t.Fatalf("expected ErrInvalidToken after revoke, got %v", err)
 	}
@@ -236,7 +236,7 @@ func TestRehash(t *testing.T) {
 	}
 
 	// Verify works with original binary
-	_, err = reg.Verify(token, binPath, "ns1")
+	_, err = reg.Verify(token, binPath, 0, "ns1")
 	if err != nil {
 		t.Fatalf("verify before update: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestRehash(t *testing.T) {
 	}
 
 	// Verify should fail now (hash mismatch)
-	_, err = reg.Verify(token, binPath, "ns1")
+	_, err = reg.Verify(token, binPath, 0, "ns1")
 	if err != ErrBinaryMismatch {
 		t.Fatalf("expected ErrBinaryMismatch after update, got %v", err)
 	}
@@ -259,7 +259,7 @@ func TestRehash(t *testing.T) {
 	}
 
 	// Verify should work again
-	_, err = reg.Verify(token, binPath, "ns1")
+	_, err = reg.Verify(token, binPath, 0, "ns1")
 	if err != nil {
 		t.Fatalf("verify after rehash: %v", err)
 	}
@@ -303,13 +303,13 @@ func TestUpdateNamespaces(t *testing.T) {
 	}
 
 	// Can access ns1
-	_, err = reg.Verify(token, binary, "ns1")
+	_, err = reg.Verify(token, binary, 0, "ns1")
 	if err != nil {
 		t.Fatalf("verify ns1: %v", err)
 	}
 
 	// Cannot access ns2
-	_, err = reg.Verify(token, binary, "ns2")
+	_, err = reg.Verify(token, binary, 0, "ns2")
 	if err != ErrNamespaceDenied {
 		t.Fatalf("expected ErrNamespaceDenied for ns2, got %v", err)
 	}
@@ -321,13 +321,13 @@ func TestUpdateNamespaces(t *testing.T) {
 	}
 
 	// Now can access ns2
-	_, err = reg.Verify(token, binary, "ns2")
+	_, err = reg.Verify(token, binary, 0, "ns2")
 	if err != nil {
 		t.Fatalf("verify ns2 after update: %v", err)
 	}
 
 	// But not ns1 anymore
-	_, err = reg.Verify(token, binary, "ns1")
+	_, err = reg.Verify(token, binary, 0, "ns1")
 	if err != ErrNamespaceDenied {
 		t.Fatalf("expected ErrNamespaceDenied for ns1 after update, got %v", err)
 	}
@@ -353,21 +353,21 @@ func TestMultipleApps(t *testing.T) {
 	}
 
 	// app1 can access ns1 but not ns2
-	_, err = reg.Verify(token1, binary, "ns1")
+	_, err = reg.Verify(token1, binary, 0, "ns1")
 	if err != nil {
 		t.Fatalf("app1 access ns1: %v", err)
 	}
-	_, err = reg.Verify(token1, binary, "ns2")
+	_, err = reg.Verify(token1, binary, 0, "ns2")
 	if err != ErrNamespaceDenied {
 		t.Fatalf("expected app1 denied ns2, got %v", err)
 	}
 
 	// app2 can access ns2 but not ns1
-	_, err = reg.Verify(token2, binary, "ns2")
+	_, err = reg.Verify(token2, binary, 0, "ns2")
 	if err != nil {
 		t.Fatalf("app2 access ns2: %v", err)
 	}
-	_, err = reg.Verify(token2, binary, "ns1")
+	_, err = reg.Verify(token2, binary, 0, "ns1")
 	if err != ErrNamespaceDenied {
 		t.Fatalf("expected app2 denied ns1, got %v", err)
 	}

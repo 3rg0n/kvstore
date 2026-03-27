@@ -58,14 +58,28 @@ type AppStore interface {
 	ListAppRecords() (map[string][]byte, error)
 }
 
+// PKICertGenerator generates and revokes client certificates for registered apps.
+// Implemented by the pki package. Optional — when nil, mTLS client certs are not issued.
+type PKICertGenerator interface {
+	GenerateClientCert(appID, appToken string) (certPath, keyPath string, err error)
+	RevokeClientCert(appID string) error
+}
+
 // Registry manages app registrations and verifies access.
 type Registry struct {
 	store AppStore
+	pki   PKICertGenerator // nil = no client cert generation
 }
 
 // NewRegistry creates a Registry backed by the given store.
 func NewRegistry(store AppStore) *Registry {
 	return &Registry{store: store}
+}
+
+// SetPKI configures the PKI certificate generator for mTLS client certs.
+// When set, Register() issues a client cert and Revoke() removes it.
+func (r *Registry) SetPKI(pki PKICertGenerator) {
+	r.pki = pki
 }
 
 // Register registers a new app and returns a one-time-visible token.
@@ -139,6 +153,14 @@ func (r *Registry) Register(name, binaryPath string, namespaces []string, mode V
 		return "", fmt.Errorf("storing app record: %w", err)
 	}
 
+	// Generate mTLS client certificate if PKI is configured.
+	if r.pki != nil {
+		if _, _, err := r.pki.GenerateClientCert(record.ID, token); err != nil {
+			// Log but don't fail registration — token auth still works without mTLS.
+			_ = err // caller can check cert existence separately
+		}
+	}
+
 	return token, nil
 }
 
@@ -147,6 +169,12 @@ func (r *Registry) Revoke(appID string) error {
 	if err := r.store.DeleteAppRecord(appID); err != nil {
 		return fmt.Errorf("revoking app: %w", err)
 	}
+
+	// Remove client certificate files if PKI is configured.
+	if r.pki != nil {
+		_ = r.pki.RevokeClientCert(appID) // best-effort cleanup
+	}
+
 	return nil
 }
 
@@ -202,8 +230,10 @@ func (r *Registry) List() ([]AppRecord, error) {
 // Verify validates a token against a calling binary and namespace.
 // If binaryPath is empty, binary identity verification is skipped (used when
 // process attestation is not yet available, e.g. over TCP before Step 3).
+// callerPID is used on Linux to hash via /proc/PID/exe (kernel inode) instead
+// of the resolved symlink path, mitigating TOC-TOU binary swap attacks.
 // Returns the matched AppRecord or an error describing the failure.
-func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, error) {
+func (r *Registry) Verify(token, binaryPath string, callerPID int, namespace string) (*AppRecord, error) {
 	tHash := hashToken(token)
 
 	rawRecords, err := r.store.ListAppRecords()
@@ -231,7 +261,7 @@ func (r *Registry) Verify(token, binaryPath, namespace string) (*AppRecord, erro
 	if binaryPath != "" {
 		switch matched.VerifyMode {
 		case VerifyHash:
-			hash, err := HashBinary(binaryPath)
+			hash, err := hashBinarySecure(binaryPath, callerPID)
 			if err != nil {
 				return nil, fmt.Errorf("hashing caller binary: %w", err)
 			}

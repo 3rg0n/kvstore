@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"log/slog"
 	"net"
@@ -15,11 +16,12 @@ const appRecordCtxKey contextKey = "app_record"
 
 type connCtxKey struct{}
 
-// ProcessVerifier resolves a network connection to a binary path.
-// Implemented by platform.Platform.
+// ProcessVerifier resolves a network connection to a caller's binary path.
+// Implemented by platform.Platform. The single-method interface ensures PID
+// resolution and path lookup happen atomically — on Windows, the process
+// handle is held open between the two steps to prevent PID reuse attacks.
 type ProcessVerifier interface {
-	PeerPID(conn net.Conn) (int, error)
-	ProcessPath(pid int) (string, error)
+	ResolveBinary(conn net.Conn) (pid int, path string, err error)
 }
 
 // Middleware validates app tokens and namespace ACLs on HTTP requests.
@@ -38,7 +40,12 @@ func NewMiddleware(registry *Registry, verifier ProcessVerifier, logger *slog.Lo
 // ConnContext returns a function suitable for http.Server.ConnContext that
 // injects each connection into the request context. This enables the
 // middleware to retrieve the peer PID for process attestation.
+// When TLS is active, the underlying IPC connection is unwrapped so that
+// PeerPID resolution works through the TLS layer.
 func ConnContext(ctx context.Context, conn net.Conn) context.Context {
+	if tlsConn, ok := conn.(*tls.Conn); ok {
+		conn = tlsConn.NetConn()
+	}
 	return context.WithValue(ctx, connCtxKey{}, conn)
 }
 
@@ -65,9 +72,9 @@ func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Attempt to resolve caller binary path via process attestation
-		binaryPath := m.resolveBinaryPath(r.Context())
+		binaryPath, callerPID := m.resolveBinaryPath(r.Context())
 
-		rec, err := m.registry.Verify(token, binaryPath, namespace)
+		rec, err := m.registry.Verify(token, binaryPath, callerPID, namespace)
 		if err != nil {
 			m.logger.Debug("auth.denied",
 				"reason", err.Error(),
@@ -98,32 +105,28 @@ func (m *Middleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// resolveBinaryPath attempts to get the caller's binary path from the
-// connection stored in context. Returns empty string if unavailable.
-func (m *Middleware) resolveBinaryPath(ctx context.Context) string {
+// resolveBinaryPath attempts to get the caller's binary path and PID from the
+// connection stored in context. Returns empty string and 0 if unavailable.
+// The PID is passed through so the registry can use /proc/PID/exe on Linux
+// for TOC-TOU resistant hashing.
+func (m *Middleware) resolveBinaryPath(ctx context.Context) (string, int) {
 	if m.verifier == nil {
-		return ""
+		return "", 0
 	}
 
 	conn, ok := ctx.Value(connCtxKey{}).(net.Conn)
 	if !ok || conn == nil {
-		return ""
+		return "", 0
 	}
 
-	pid, err := m.verifier.PeerPID(conn)
+	pid, path, err := m.verifier.ResolveBinary(conn)
 	if err != nil {
-		m.logger.Debug("auth.binary_resolve", "step", "PeerPID", "err", err)
-		return ""
-	}
-
-	path, err := m.verifier.ProcessPath(pid)
-	if err != nil {
-		m.logger.Debug("auth.binary_resolve", "step", "ProcessPath", "pid", pid, "err", err)
-		return ""
+		m.logger.Debug("auth.binary_resolve", "err", err)
+		return "", 0
 	}
 
 	m.logger.Debug("auth.binary_resolve", "pid", pid, "path", path)
-	return path
+	return path, pid
 }
 
 // AppFromContext retrieves the verified AppRecord from the request context.
