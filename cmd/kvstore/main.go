@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,11 +11,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/ecopelan/kvstore/internal/auth"
 	"github.com/ecopelan/kvstore/internal/config"
+	"github.com/ecopelan/kvstore/internal/pki"
 	"github.com/ecopelan/kvstore/internal/platform"
 	"github.com/ecopelan/kvstore/internal/server"
 	svc "github.com/ecopelan/kvstore/internal/service"
@@ -55,7 +58,7 @@ func init() {
 	appRegisterCmd.Flags().String("binary", "", "path to the application binary (required)")
 	appRegisterCmd.Flags().StringSlice("namespaces", nil, "allowed namespaces (comma-separated, required)")
 	appRegisterCmd.Flags().String("name", "", "friendly name for the app (defaults to binary filename)")
-	appRegisterCmd.Flags().String("verify", "auto", "verification mode: hash, signature, or auto")
+	appRegisterCmd.Flags().String("verify", "auto", "verification mode: hash, signature, or auto (auto prefers signature on Windows/macOS)")
 	_ = appRegisterCmd.MarkFlagRequired("binary")
 	_ = appRegisterCmd.MarkFlagRequired("namespaces")
 
@@ -361,7 +364,20 @@ func (p *serveProgram) Start(_ service.Service) error {
 	plat := platform.New()
 
 	if !p.noAuth {
+		// Ensure installation CA exists (generates on first run).
+		if err := pki.EnsureCA(p.store, config.DataDir()); err != nil {
+			return fmt.Errorf("ensuring installation CA: %w", err)
+		}
+		p.logger.Info("installation CA ready", "ca_cert", config.CAPath())
+
+		// Create server TLS config with mTLS.
+		tlsConfig, err := pki.NewServerTLSConfig(p.store, config.DataDir())
+		if err != nil {
+			return fmt.Errorf("generating server TLS config: %w", err)
+		}
+
 		reg := auth.NewRegistry(p.store)
+		reg.SetPKI(pki.NewRegistryCertGenerator(p.store, config.DataDir()))
 		authMw = auth.NewMiddleware(reg, plat, p.logger)
 
 		// Try platform-native IPC listener (named pipe / Unix socket).
@@ -381,9 +397,12 @@ func (p *serveProgram) Start(_ service.Service) error {
 				return fmt.Errorf("listen: %w", err)
 			}
 		}
-		p.logger.Info("app token authentication enabled", "listener", ln.Addr())
+
+		// Wrap listener with TLS for encrypted IPC.
+		ln = tls.NewListener(ln, tlsConfig)
+		p.logger.Info("mTLS IPC enabled", "listener", ln.Addr())
 	} else {
-		p.logger.Warn("app token authentication DISABLED (--no-auth)")
+		p.logger.Warn("app token authentication AND TLS DISABLED (--no-auth)")
 		ln, err = net.Listen("tcp", p.addr)
 		if err != nil {
 			return fmt.Errorf("listen: %w", err)
@@ -580,6 +599,7 @@ var appRegisterCmd = &cobra.Command{
 		}
 
 		reg := auth.NewRegistry(s)
+		reg.SetPKI(pki.NewRegistryCertGenerator(s, config.DataDir()))
 		token, err := reg.Register(name, binaryPath, namespaces, mode)
 		if err != nil {
 			return err
@@ -605,8 +625,23 @@ var appRegisterCmd = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "  Signer:     %s\n", app.SignerID)
 				}
 				fmt.Fprintf(os.Stderr, "  Namespaces: %s\n", strings.Join(app.Namespaces, ", "))
+
+				// Recommend signature mode on platforms with code signing
+				if app.VerifyMode == auth.VerifyHash && (runtime.GOOS == "darwin" || runtime.GOOS == "windows") {
+					fmt.Fprintf(os.Stderr, "\n  Note: signature mode is recommended on %s — it survives binary\n", runtime.GOOS)
+					fmt.Fprintf(os.Stderr, "  updates and is verified by the OS kernel at exec time, reducing\n")
+					fmt.Fprintf(os.Stderr, "  TOC-TOU attack surface. Use --verify signature if the binary is code-signed.\n")
+				}
 				break
 			}
+		}
+
+		// Show mTLS cert paths if CA exists.
+		if _, statErr := os.Stat(config.CAPath()); statErr == nil {
+			fmt.Fprintf(os.Stderr, "\nmTLS Configuration:\n")
+			fmt.Fprintf(os.Stderr, "  CA cert:     %s\n", config.CAPath())
+			fmt.Fprintf(os.Stderr, "  Client cert: %s\n", config.ClientCertPath(apps[len(apps)-1].ID))
+			fmt.Fprintf(os.Stderr, "  Client key:  %s (encrypted with token via HKDF)\n", config.ClientKeyPath(apps[len(apps)-1].ID))
 		}
 
 		fmt.Fprintf(os.Stderr, "\nApp token (save this, shown only once):\n")

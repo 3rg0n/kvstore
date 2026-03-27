@@ -21,6 +21,7 @@ var (
 
 	metaBucket  = []byte("_meta")
 	appsBucket  = []byte("_apps")
+	pkiBucket   = []byte("_pki")
 	saltKey     = []byte("salt")
 	verifyKey   = []byte("verify")
 	modeKey     = []byte("mode")
@@ -362,7 +363,7 @@ func (s *Store) ListNamespaces() ([]string, error) {
 	var namespaces []string
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			if string(name) != string(metaBucket) && string(name) != string(appsBucket) {
+			if string(name) != string(metaBucket) && string(name) != string(appsBucket) && string(name) != string(pkiBucket) {
 				namespaces = append(namespaces, string(name))
 			}
 			return nil
@@ -452,6 +453,49 @@ func (s *Store) ListAppRecords() (map[string][]byte, error) {
 		})
 	})
 	return records, err
+}
+
+// PutPKIData stores encrypted PKI data (e.g., CA private key) by key name.
+func (s *Store) PutPKIData(key string, data []byte) error {
+	if s.key == nil {
+		return ErrNotInitialized
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(pkiBucket)
+		if err != nil {
+			return fmt.Errorf("creating pki bucket: %w", err)
+		}
+		encrypted, err := crypto.Encrypt(s.key, data)
+		if err != nil {
+			return fmt.Errorf("encrypting pki data: %w", err)
+		}
+		return b.Put([]byte(key), encrypted)
+	})
+}
+
+// GetPKIData retrieves and decrypts PKI data by key name.
+func (s *Store) GetPKIData(key string) ([]byte, error) {
+	if s.key == nil {
+		return nil, ErrNotInitialized
+	}
+	var result []byte
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(pkiBucket)
+		if b == nil {
+			return ErrNotFound
+		}
+		data := b.Get([]byte(key))
+		if data == nil {
+			return ErrNotFound
+		}
+		decrypted, err := crypto.Decrypt(s.key, data)
+		if err != nil {
+			return fmt.Errorf("decrypting pki data: %w", err)
+		}
+		result = decrypted
+		return nil
+	})
+	return result, err
 }
 
 // Close closes the store and zeros the master key.

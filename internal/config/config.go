@@ -56,3 +56,33 @@ func SocketPath() string {
 func EnsureDataDir() error {
 	return os.MkdirAll(DataDir(), 0700)
 }
+
+// PKIDir returns the path to the PKI directory.
+func PKIDir() string {
+	return filepath.Join(DataDir(), "pki")
+}
+
+// CAPath returns the path to the CA certificate (PEM, public).
+func CAPath() string {
+	return filepath.Join(PKIDir(), "ca.crt")
+}
+
+// ClientCertsDir returns the path to the client certificates directory.
+func ClientCertsDir() string {
+	return filepath.Join(PKIDir(), "clients")
+}
+
+// ClientCertPath returns the path to a client certificate.
+func ClientCertPath(appID string) string {
+	return filepath.Join(ClientCertsDir(), appID+".crt")
+}
+
+// ClientKeyPath returns the path to an encrypted client private key.
+func ClientKeyPath(appID string) string {
+	return filepath.Join(ClientCertsDir(), appID+".key.enc")
+}
+
+// EnsurePKIDir creates the PKI directories if they don't exist.
+func EnsurePKIDir() error {
+	return os.MkdirAll(ClientCertsDir(), 0700)
+}
