@@ -282,3 +282,99 @@ func TestNotInitialized(t *testing.T) {
 		t.Fatalf("expected ErrNotInitialized for Set, got: %v", err)
 	}
 }
+
+// --- PKI data store tests ---
+
+func TestPutGetPKIData(t *testing.T) {
+	s := testStore(t)
+
+	data := []byte("-----BEGIN EC PRIVATE KEY-----\nfake-ca-key\n-----END EC PRIVATE KEY-----")
+	if err := s.PutPKIData("ca-key", data); err != nil {
+		t.Fatalf("PutPKIData: %v", err)
+	}
+
+	got, err := s.GetPKIData("ca-key")
+	if err != nil {
+		t.Fatalf("GetPKIData: %v", err)
+	}
+	if string(got) != string(data) {
+		t.Fatalf("got %q, want %q", got, data)
+	}
+}
+
+func TestGetPKIDataNotFound(t *testing.T) {
+	s := testStore(t)
+
+	// No _pki bucket created yet — should return ErrNotFound.
+	_, err := s.GetPKIData("nonexistent")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got: %v", err)
+	}
+
+	// Create the bucket by writing, then read a missing key.
+	if err := s.PutPKIData("exists", []byte("data")); err != nil {
+		t.Fatalf("PutPKIData: %v", err)
+	}
+	_, err = s.GetPKIData("missing-key")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound for missing key, got: %v", err)
+	}
+}
+
+func TestPKIDataOverwrite(t *testing.T) {
+	s := testStore(t)
+
+	if err := s.PutPKIData("key", []byte("v1")); err != nil {
+		t.Fatalf("PutPKIData v1: %v", err)
+	}
+	if err := s.PutPKIData("key", []byte("v2")); err != nil {
+		t.Fatalf("PutPKIData v2: %v", err)
+	}
+
+	got, err := s.GetPKIData("key")
+	if err != nil {
+		t.Fatalf("GetPKIData: %v", err)
+	}
+	if string(got) != "v2" {
+		t.Fatalf("got %q, want %q", got, "v2")
+	}
+}
+
+func TestPKIDataNotInitialized(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if err := s.PutPKIData("k", []byte("v")); err != ErrNotInitialized {
+		t.Fatalf("expected ErrNotInitialized for PutPKIData, got: %v", err)
+	}
+	_, err = s.GetPKIData("k")
+	if err != ErrNotInitialized {
+		t.Fatalf("expected ErrNotInitialized for GetPKIData, got: %v", err)
+	}
+}
+
+func TestPKIBucketExcludedFromNamespaces(t *testing.T) {
+	s := testStore(t)
+
+	// Create user data and PKI data.
+	_ = s.Set("myns", "key", []byte("val"))
+	_ = s.PutPKIData("ca-key", []byte("secret"))
+
+	ns, err := s.ListNamespaces()
+	if err != nil {
+		t.Fatalf("ListNamespaces: %v", err)
+	}
+
+	for _, name := range ns {
+		if name == "_pki" {
+			t.Fatal("_pki bucket should not appear in ListNamespaces")
+		}
+	}
+	if len(ns) != 1 || ns[0] != "myns" {
+		t.Fatalf("expected [myns], got %v", ns)
+	}
+}
